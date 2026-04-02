@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-The autoposter supports AI-powered rewriting of post titles and descriptions before publication. The AI layer consists of:
+Postery supports AI-powered rewriting of post titles and descriptions before publication. The AI layer consists of:
 
 - **`ai_providers` table** — stores provider credentials and which one is active
 - **`/api/ai/generate` endpoint** — accepts text + source context, calls the active provider, returns the rewritten text

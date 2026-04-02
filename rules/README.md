@@ -1,6 +1,6 @@
 # Rules Directory — Master Orchestrator
 
-> **Purpose:** Serve as the single entry point for AI agents to understand all mandatory rules, dependencies, and execution order for the `posting.iliya-code.ru` autoposter project.
+> **Purpose:** Serve as the single entry point for AI agents to understand all mandatory rules, dependencies, and execution order for the Postery project.
 > **Context:** Read this file first. Follow the steps exactly before touching any code, schema, or documentation.
 > **Version:** 1.1
 
@@ -21,7 +21,7 @@ Before any task:
 
 ## 2. Project Overview
 
-**posting.iliya-code.ru** is a FastAPI-based multi-platform autoposter that publishes content to Telegram, VKontakte, and MAX Messenger. Key characteristics:
+**Postery** is a FastAPI-based multi-platform autoposter that publishes content to Telegram, VKontakte, and MAX Messenger. Key characteristics:
 
 - **Language / Runtime:** Python 3.11+, FastAPI + Uvicorn
 - **Database:** SQLite via SQLAlchemy ORM (no Alembic — manual additive migrations in `main.py`)
