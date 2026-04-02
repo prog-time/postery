@@ -6,9 +6,9 @@
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from app.config import BASE_DIR
+from app.config import BASE_DIR, MAX_ATTEMPTS, RETRY_DELAY_MINUTES
 from app.database import SessionLocal
 from app.models.post import PostChannel, ChannelStatus, PostStatus
 from app.models.sources.telegram import TelegramSource
@@ -45,7 +45,8 @@ async def _process_due_channels():
 
         due = [
             ch for ch in pending
-            if ch.scheduled_at is None or ch.scheduled_at <= now
+            if (ch.scheduled_at is None or ch.scheduled_at <= now)
+            and (ch.retry_after is None or ch.retry_after <= now)
         ]
 
     for channel in due:
@@ -99,9 +100,27 @@ async def _publish_channel(channel_id: int):
         else:
             success, error = False, f"Unsupported source type: {channel.source_type}"
 
-        channel.status = ChannelStatus.PUBLISHED if success else ChannelStatus.FAILED
-        channel.published_at = datetime.now() if success else None
-        channel.error_message = error
+        if success:
+            channel.status = ChannelStatus.PUBLISHED
+            channel.published_at = datetime.now()
+            channel.error_message = None
+            # attempt is preserved for analytics (per AC-6)
+        else:
+            channel.attempt += 1
+            channel.error_message = error[:500] if error else None
+
+            if channel.attempt < MAX_ATTEMPTS:
+                # Остаётся PENDING; следующая попытка через attempt * RETRY_DELAY_MINUTES мин
+                delay_minutes = channel.attempt * RETRY_DELAY_MINUTES
+                channel.retry_after = datetime.now() + timedelta(minutes=delay_minutes)
+                log.warning(
+                    "Channel %d: attempt %d/%d, retry in %d min",
+                    channel_id, channel.attempt, MAX_ATTEMPTS, delay_minutes,
+                )
+            else:
+                channel.status = ChannelStatus.FAILED
+                channel.retry_after = None
+                log.error("Channel %d failed: %s", channel_id, error)
 
         # Если все каналы опубликованы — помечаем пост
         db.flush()
@@ -116,5 +135,3 @@ async def _publish_channel(channel_id: int):
 
         if success:
             log.info("Channel %d published successfully", channel_id)
-        else:
-            log.error("Channel %d failed: %s", channel_id, error)

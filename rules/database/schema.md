@@ -58,6 +58,8 @@ erDiagram
         datetime scheduled_at
         datetime published_at
         text error_message
+        int attempt
+        datetime retry_after
     }
     admin_users {
         int id PK
@@ -166,6 +168,8 @@ erDiagram
 | scheduled_at | DATETIME | Yes | NULL | Publish at this time. NULL = publish immediately |
 | published_at | DATETIME | Yes | NULL | Actual publish timestamp (set by worker on success) |
 | error_message | TEXT | Yes | NULL | Last error string from publisher (truncated to 500 chars) |
+| attempt | INTEGER | No | 0 | Number of publish attempts made. Preserved on success for analytics. Added via `_migrate()` (TASK-002). |
+| retry_after | DATETIME | Yes | NULL | Next allowed retry timestamp. Worker skips this channel if `retry_after > now()`. NULL means no delay. Added via `_migrate()` (TASK-002). |
 
 **Computed properties (ORM, not DB columns):**
 - `effective_title` → `title or post.title`

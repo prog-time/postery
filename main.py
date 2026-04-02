@@ -25,6 +25,9 @@ def _migrate() -> None:
         ("vk_sources",       "ai_prompt_description", "TEXT"),
         ("max_sources",      "ai_prompt_title",       "TEXT"),
         ("max_sources",      "ai_prompt_description", "TEXT"),
+        # TASK-002: retry mechanism
+        ("post_channels",    "attempt",               "INTEGER NOT NULL DEFAULT 0"),
+        ("post_channels",    "retry_after",           "DATETIME"),
     ]
     with engine.connect() as conn:
         for table, column, col_type in migrations:

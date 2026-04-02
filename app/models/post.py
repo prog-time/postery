@@ -74,6 +74,8 @@ class PostChannel(Base):
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempt: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    retry_after: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     post: Mapped["Post"] = relationship(back_populates="channels")
 
