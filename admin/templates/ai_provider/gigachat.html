@@ -1,0 +1,199 @@
+{% extends "layout.html" %}
+
+{% block header %}
+<div class="d-flex justify-content-between align-items-center">
+    <h1>AI провайдеры</h1>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for(__name__ ~ ':index') }}">Админ</a></li>
+        <li class="breadcrumb-item"><a href="{{ list_url }}">AI провайдеры</a></li>
+        <li class="breadcrumb-item active">{{ "Редактирование" if editing else "Добавление" }} — GigaChat</li>
+    </ol>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-lg-7">
+            <div class="card">
+                {% if already_exists %}
+                <div class="card-body">
+                    <div class="alert alert-warning mb-0">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                        Провайдер GigaChat уже добавлен. Вы можете отредактировать его в списке.
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ list_url }}" class="btn btn-secondary">← Назад</a>
+                </div>
+                {% else %}
+                {% set form_action = (wizard_url ~ '?pk=' ~ provider.id) if editing else (wizard_url ~ '?type=gigachat') %}
+                <form action="{{ form_action }}" method="POST">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fa-solid fa-comment-dots me-2 text-primary"></i>
+                            {{ "Редактирование" if editing else "Добавление" }} — GigaChat
+                        </h3>
+                    </div>
+                    <div class="card-body border-bottom py-3">
+
+                        {% if errors.provider_type %}
+                            <div class="alert alert-danger">{{ errors.provider_type }}</div>
+                        {% endif %}
+
+                        {# Authorization Key #}
+                        <div class="mb-3">
+                            <label class="form-label {% if not editing %}required{% endif %}">Authorization Key</label>
+                            <input type="password" name="api_key"
+                                   class="form-control {% if errors.api_key %}is-invalid{% endif %}"
+                                   placeholder="{{ 'Оставьте пустым, чтобы не менять' if editing else 'Base64-ключ' }}"
+                                   autocomplete="off">
+                            {% if errors.api_key %}
+                                <div class="invalid-feedback">{{ errors.api_key }}</div>
+                            {% endif %}
+                            <small class="form-hint">
+                                {% if editing %}
+                                    Введите новый ключ для замены или оставьте поле пустым
+                                {% else %}
+                                    Authorization key из <a href="https://developers.sber.ru/studio" target="_blank">личного кабинета GigaChat</a>
+                                {% endif %}
+                            </small>
+                        </div>
+
+                        {# Scope #}
+                        <div class="mb-3">
+                            <label class="form-label required">Scope</label>
+                            {% set cur_scope = form.scope if form.scope is defined and form.scope else (provider.scope if editing else 'GIGACHAT_API_PERS') %}
+                            <select name="scope" class="form-select">
+                                <option value="GIGACHAT_API_PERS" {{ 'selected' if cur_scope == 'GIGACHAT_API_PERS' else '' }}>
+                                    Физическое лицо (GIGACHAT_API_PERS)
+                                </option>
+                                <option value="GIGACHAT_API_CORP" {{ 'selected' if cur_scope == 'GIGACHAT_API_CORP' else '' }}>
+                                    Корпоративный (GIGACHAT_API_CORP)
+                                </option>
+                            </select>
+                        </div>
+
+                        {# Is Active #}
+                        <div class="mb-3">
+                            <label class="form-check">
+                                <input type="checkbox" name="is_active" class="form-check-input"
+                                       {% if form.get('is_active') == 'on' %}checked
+                                       {% elif not form and editing and provider.is_active %}checked
+                                       {% endif %}>
+                                <span class="form-check-label">Активен</span>
+                            </label>
+                            <small class="form-hint">При активации остальные провайдеры будут деактивированы</small>
+                        </div>
+
+                        {# Test status #}
+                        <div id="ai-test-status" style="display:none;">
+                            <div id="ai-test-msg" class="alert mb-0"></div>
+                        </div>
+
+                    </div>
+                    <div class="card-footer">
+                        <div class="btn-list ms-auto justify-content-end">
+                            <a href="{{ list_url }}" class="btn btn-danger">Отмена</a>
+                            <button type="button" id="btn-test" class="btn btn-secondary">
+                                <i class="fa-solid fa-plug me-1"></i>Проверить
+                            </button>
+                            <button type="submit" id="btn-save" class="btn btn-success"
+                                    {% if not editing %}disabled{% endif %}>
+                                Сохранить
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+{{ super() }}
+{% if not already_exists %}
+<script>
+(function () {
+    const editing   = {{ 'true' if editing else 'false' }};
+    const btnTest   = document.getElementById('btn-test');
+    const btnSave   = document.getElementById('btn-save');
+    const statusDiv = document.getElementById('ai-test-status');
+    const msgDiv    = document.getElementById('ai-test-msg');
+    const apiKeyInput = document.querySelector('[name="api_key"]');
+
+    function updateSaveState() {
+        if (editing) {
+            const hasNewKey = apiKeyInput.value.trim().length > 0;
+            if (!hasNewKey) {
+                btnSave.disabled = false;
+                statusDiv.style.display = 'none';
+            } else {
+                btnSave.disabled = true;
+            }
+        }
+    }
+
+    apiKeyInput.addEventListener('input', () => {
+        updateSaveState();
+        if (!editing || apiKeyInput.value.trim().length > 0) {
+            statusDiv.style.display = 'none';
+        }
+    });
+
+    if (!editing) {
+        document.querySelector('form').addEventListener('input',  () => {
+            btnSave.disabled = true;
+            statusDiv.style.display = 'none';
+        });
+        document.querySelector('form').addEventListener('change', () => {
+            btnSave.disabled = true;
+            statusDiv.style.display = 'none';
+        });
+    }
+
+    function showMsg(ok, text) {
+        statusDiv.style.display = 'block';
+        msgDiv.className = ok ? 'alert alert-success mb-0' : 'alert alert-danger mb-0';
+        msgDiv.innerHTML = `<i class="fa-solid ${ok ? 'fa-check-circle' : 'fa-times-circle'} me-2"></i>${text}`;
+    }
+
+    btnTest.addEventListener('click', async () => {
+        const apiKey = apiKeyInput.value.trim();
+        const scope  = document.querySelector('[name="scope"]').value;
+
+        if (!apiKey) {
+            showMsg(false, editing ? 'Введите новый Authorization Key для проверки' : 'Введите Authorization Key');
+            return;
+        }
+
+        btnTest.disabled = true;
+        btnTest.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Проверяем…';
+
+        try {
+            const resp   = await fetch('/api/ai-provider/test', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ provider_type: 'gigachat', api_key: apiKey, scope }),
+            });
+            const result = await resp.json();
+            if (result.ok) {
+                showMsg(true, 'Подключение успешно');
+                btnSave.disabled = false;
+            } else {
+                showMsg(false, result.error || 'Ошибка подключения');
+                btnSave.disabled = true;
+            }
+        } catch (e) {
+            showMsg(false, 'Ошибка запроса: ' + e.message);
+        } finally {
+            btnTest.disabled = false;
+            btnTest.innerHTML = '<i class="fa-solid fa-plug me-1"></i>Проверить';
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}
