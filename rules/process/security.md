@@ -38,18 +38,29 @@ class TelegramSource(Base):
 
 ## 3. SECRET_KEY
 
-The `SECRET_KEY` in `app/config.py` is the root of the encryption key derivation:
+`SECRET_KEY` is the root of the encryption key derivation (Fernet) and the session cookie signing key. It is loaded exclusively from the environment — **there is no hardcoded fallback**.
 
 ```python
-# app/config.py (development default — MUST change for production)
-SECRET_KEY = "change-me-in-production"
+# app/config.py — will raise RuntimeError if SECRET_KEY is not set
+import os
+_secret_key = os.environ.get("SECRET_KEY")
+if not _secret_key:
+    raise RuntimeError("SECRET_KEY is not set. ...")
+SECRET_KEY = _secret_key
 ```
 
+**How to set:**
+
+1. Copy `.env.example` to `.env` (already in `.gitignore`).
+2. Generate a key: `python -c "import secrets; print(secrets.token_hex(32))"`.
+3. Set `SECRET_KEY=<generated-value>` in `.env`.
+
 **Rules:**
-- Change `SECRET_KEY` before deploying to any non-development environment
-- Use a minimum 32-character random string (e.g., `secrets.token_hex(32)`)
+- Never use `os.getenv("SECRET_KEY", "some-default")` — a hardcoded default creates a false sense of security
+- Use a minimum 32-character random hex string
+- `.env` must never be committed to version control (it is already in `.gitignore`)
 - If `SECRET_KEY` changes in production, all existing encrypted values in the database become unreadable — never rotate without a migration plan
-- Never commit `SECRET_KEY` to version control as a real value
+- The application will refuse to start if `SECRET_KEY` is missing or empty
 
 ---
 
