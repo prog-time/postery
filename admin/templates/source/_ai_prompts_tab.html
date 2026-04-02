@@ -1,0 +1,21 @@
+{#
+  Вкладка "AI промпты" для форм редактирования источников.
+  Переменные из контекста: source, form
+#}
+<div class="mb-3">
+    <label class="form-label">AI промпт для заголовка</label>
+    <textarea name="ai_prompt_title" rows="4"
+              class="form-control font-monospace"
+              placeholder="Например: Перепиши заголовок кратко и цепляюще, до 10 слов."
+              >{{ form.ai_prompt_title if form.ai_prompt_title is defined else (source.ai_prompt_title or '') }}</textarea>
+    <small class="form-hint">Инструкция для AI при обработке заголовка. Поддерживается Markdown.</small>
+</div>
+
+<div class="mb-0">
+    <label class="form-label">AI промпт для описания</label>
+    <textarea name="ai_prompt_description" rows="6"
+              class="form-control font-monospace"
+              placeholder="Например: Перепиши текст в деловом стиле. Используй **жирный** для ключевых слов."
+              >{{ form.ai_prompt_description if form.ai_prompt_description is defined else (source.ai_prompt_description or '') }}</textarea>
+    <small class="form-hint">Инструкция для AI при обработке текста поста. Поддерживается Markdown.</small>
+</div>

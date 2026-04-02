@@ -1,0 +1,62 @@
+{# Поля формы MAX Мессенджер — используется в tab-params и в режиме создания #}
+
+{# Название #}
+<div class="mb-3">
+    <label class="form-label required">Название</label>
+    <input type="text" name="name"
+           class="form-control {% if errors.name %}is-invalid{% endif %}"
+           value="{{ form.name if form.name is defined else (source.name if editing else '') }}"
+           placeholder="Новостной канал MAX">
+    {% if errors.name %}
+        <div class="invalid-feedback">{{ errors.name }}</div>
+    {% endif %}
+    <small class="form-hint">Понятное имя источника, например: Новостной канал MAX</small>
+</div>
+
+{# Bot Token #}
+<div class="mb-3">
+    <label class="form-label {% if not editing %}required{% endif %}">Bot Token</label>
+    <input type="password" name="bot_token"
+           class="form-control {% if errors.bot_token %}is-invalid{% endif %}"
+           placeholder="{{ 'Оставьте пустым, чтобы не менять' if editing else 'Токен бота из botapi.max.ru' }}"
+           autocomplete="off">
+    {% if errors.bot_token %}
+        <div class="invalid-feedback">{{ errors.bot_token }}</div>
+    {% endif %}
+    <small class="form-hint">
+        {% if editing %}
+            Введите новый токен для замены или оставьте поле пустым
+        {% else %}
+            Токен бота из личного кабинета botapi.max.ru
+        {% endif %}
+    </small>
+</div>
+
+{# Chat ID #}
+<div class="mb-3">
+    <label class="form-label required">Chat ID</label>
+    <input type="text" name="chat_id"
+           class="form-control {% if errors.chat_id %}is-invalid{% endif %}"
+           value="{{ form.chat_id if form.chat_id is defined else (source.chat_id if editing else '') }}"
+           placeholder="Числовой ID канала/чата">
+    {% if errors.chat_id %}
+        <div class="invalid-feedback">{{ errors.chat_id }}</div>
+    {% endif %}
+    <small class="form-hint">Числовой ID канала или чата</small>
+</div>
+
+{# Is Active #}
+<div class="mb-3">
+    <label class="form-check">
+        <input type="checkbox" name="is_active" class="form-check-input"
+               {% if form.get('is_active') == 'on' %}checked
+               {% elif not form and editing and source.is_active %}checked
+               {% endif %}>
+        <span class="form-check-label">Активен</span>
+    </label>
+</div>
+
+{# Test status #}
+<div id="max-test-status" style="display:none;">
+    <div id="max-test-msg" class="alert mb-0"></div>
+</div>
