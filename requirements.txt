@@ -11,3 +11,6 @@ httpx
 cryptography
 python-dotenv
 slowapi
+pytest
+pytest-asyncio
+respx
