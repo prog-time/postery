@@ -51,3 +51,4 @@ htmlcov/
 
 # mypy
 .mypy_cache/
+tasks

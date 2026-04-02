@@ -9,3 +9,4 @@ itsdangerous
 bcrypt
 httpx
 cryptography
+python-dotenv
