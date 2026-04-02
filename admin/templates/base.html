@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="{{ get_locale() }}">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    {% if favicon_url %}
+        <link rel="icon" type="image/x-icon" href="{{ favicon_url }}"/>
+    {% endif %}
+    {% block head_meta %}{% endblock %}
+    {% block title %}<title>{{ title or app_title }}</title>{% endblock %}
+    <link rel="stylesheet" href="{{ url_for(__name__ ~ ':statics', path='css/tabler.min-1.1.0.css') }}">
+    <link rel="stylesheet" href="{{ url_for(__name__ ~ ':statics', path='css/fontawesome.min.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --tblr-font-sans-serif: 'Inter', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+
+            /* Sidebar palette */
+            --sidebar-bg:        #0f172a;
+            --sidebar-bg2:       #1e293b;
+            --sidebar-accent:    #6366f1;
+            --sidebar-accent-bg: rgba(99, 102, 241, 0.15);
+            --sidebar-text:      #94a3b8;
+            --sidebar-text-hover:#e2e8f0;
+            --sidebar-border:    rgba(255,255,255,0.06);
+        }
+
+        body { font-feature-settings: "cv03","cv04","cv11"; }
+
+        /* ── Sidebar ────────────────────────────────────────────────── */
+        .navbar-vertical {
+            background: var(--sidebar-bg) !important;
+            border-right: 1px solid var(--sidebar-border) !important;
+            width: 260px;
+        }
+
+        /* Brand / logo area */
+        .navbar-vertical .navbar-brand {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--sidebar-border);
+            margin-bottom: .5rem;
+        }
+        .navbar-vertical .navbar-brand h3 {
+            color: #fff;
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: -.3px;
+            margin: 0;
+        }
+        .navbar-vertical .navbar-brand h3::before {
+            content: '⚡ ';
+            font-size: .9em;
+        }
+
+        /* Nav items */
+        .navbar-vertical .nav-item { margin: 2px 12px; }
+
+        .navbar-vertical .nav-link {
+            color: var(--sidebar-text) !important;
+            font-size: .875rem;
+            font-weight: 500;
+            border-radius: 8px;
+            padding: .55rem .9rem;
+            transition: background .15s, color .15s;
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+        }
+        .navbar-vertical .nav-link:hover {
+            background: var(--sidebar-bg2) !important;
+            color: var(--sidebar-text-hover) !important;
+        }
+        .navbar-vertical .nav-link.active,
+        .navbar-vertical .nav-item.active > .nav-link {
+            background: var(--sidebar-accent-bg) !important;
+            color: #a5b4fc !important;
+        }
+        .navbar-vertical .nav-link i,
+        .navbar-vertical .nav-link svg { opacity: .8; }
+        /* всегда показывать иконки в сайдбаре */
+        .navbar-vertical .nav-link-icon { display: inline-flex !important; align-items: center; }
+
+        /* Dropdown sub-items */
+        .navbar-vertical .dropdown-menu {
+            background: transparent !important;
+            border: none;
+            padding: 0 0 0 2rem;
+        }
+        .navbar-vertical .dropdown-item {
+            color: var(--sidebar-text) !important;
+            font-size: .82rem;
+            border-radius: 6px;
+            padding: .4rem .8rem;
+        }
+        .navbar-vertical .dropdown-item:hover {
+            background: var(--sidebar-bg2) !important;
+            color: var(--sidebar-text-hover) !important;
+        }
+
+        /* Nav section label (dropdown toggle arrow) */
+        .navbar-vertical .nav-link[data-bs-toggle="collapse"]::after {
+            margin-left: auto;
+            opacity: .5;
+            transition: transform .2s;
+        }
+        .navbar-vertical .nav-link[data-bs-toggle="collapse"]:not(.collapsed)::after {
+            transform: rotate(90deg);
+        }
+
+        /* User avatar in top-bar */
+        .avatar { background: var(--sidebar-accent-bg); }
+
+        /* ── Top navbar ─────────────────────────────────────────────── */
+        .navbar:not(.navbar-vertical) {
+            border-bottom: 1px solid #e9ecef;
+            box-shadow: 0 1px 0 rgba(0,0,0,.04);
+        }
+
+        /* ── Page background ────────────────────────────────────────── */
+        .page-wrapper { background: #f8fafc; }
+
+        /* ── Cards ──────────────────────────────────────────────────── */
+        .card {
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
+        }
+        .card-header {
+            background: #fff;
+            border-bottom: 1px solid #f1f5f9;
+            border-radius: 12px 12px 0 0 !important;
+            font-weight: 600;
+        }
+
+        /* ── Buttons ────────────────────────────────────────────────── */
+        .btn-primary {
+            background: var(--sidebar-accent);
+            border-color: var(--sidebar-accent);
+        }
+        .btn-primary:hover {
+            background: #4f46e5;
+            border-color: #4f46e5;
+        }
+
+        /* ── Table ──────────────────────────────────────────────────── */
+        .table thead th {
+            font-size: .75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #64748b;
+            background: #f8fafc;
+        }
+        .table-hover tbody tr:hover { background: #f1f5f9; }
+
+        /* ── Badge tweaks ───────────────────────────────────────────── */
+        .badge { border-radius: 6px; font-weight: 500; }
+
+        /* ── Scrollbar (sidebar) ────────────────────────────────────── */
+        .navbar-vertical::-webkit-scrollbar { width: 4px; }
+        .navbar-vertical::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 4px; }
+
+        .navbar-logo { width: auto; height: 2rem; }
+
+        /* ── Row action buttons ─────────────────────────────────────────────── */
+        .row-action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            font-size: .8rem;
+            text-decoration: none;
+            transition: background .15s, color .15s, transform .12s;
+            color: #94a3b8;
+            background: transparent;
+        }
+        .row-action-btn:hover { transform: scale(1.18); }
+
+        .row-action-btn--row_action_1_view  { color: #6366f1; }
+        .row-action-btn--row_action_1_view:hover  { background: rgba(99,102,241,.13); color: #4f46e5; }
+
+        .row-action-btn--row_action_2_edit  { color: #f59e0b; }
+        .row-action-btn--row_action_2_edit:hover  { background: rgba(245,158,11,.13); color: #d97706; }
+
+        .row-action-btn--row_action_3_delete { color: #ef4444; }
+        .row-action-btn--row_action_3_delete:hover { background: rgba(239,68,68,.13); color: #dc2626; }
+    </style>
+    {% block head_css %}{% endblock %}
+</head>
+
+<body>
+{% block body %}{% endblock %}
+{% block modal %}{% endblock %}
+<script type="text/javascript" src="{{ url_for(__name__ ~ ':statics', path='js/vendor/jquery.min.js') }}"></script>
+<script type="text/javascript" src="{{ url_for(__name__ ~ ':statics', path='js/vendor/js.cookie.min.js') }}"></script>
+<script type="text/javascript" src="{{ url_for(__name__ ~ ':statics', path='js/vendor/tabler.min-1.1.0.js') }}"></script>
+{% block script %}{% endblock %}
+<script>
+    $(function () {
+        $(".language-switcher-item").each(function () {
+            let el = $(this);
+            el.on("click", function () {
+                Cookies.set(String(el.data("cookie-name")), String(el.data("lang")));
+                window.location.reload();
+            });
+        });
+        $(".timezone-switcher-item").each(function () {
+            let el = $(this);
+            el.on("click", function () {
+                Cookies.set(String(el.data("cookie-name")), String(el.data("tz")));
+                window.location.reload();
+            });
+        });
+        {% if timezone_config and timezone_config.use_user_locale_timezone %}
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!Cookies.get('timezone') && timezone) {
+            Cookies.set('timezone', timezone);
+        }
+        {% endif %}
+    });
+</script>
+</body>
+</html>
