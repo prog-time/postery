@@ -10,3 +10,4 @@ bcrypt
 httpx
 cryptography
 python-dotenv
+slowapi

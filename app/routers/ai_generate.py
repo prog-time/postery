@@ -1,17 +1,26 @@
+import logging
 import uuid
 import warnings
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
+from app.config import AI_RATE_LIMIT_PER_MINUTE
 from app.database import SessionLocal
 from app.models.providers.ai_provider import AIProvider, ProviderType
 from app.models.sources.telegram import TelegramSource
 from app.models.sources.vk import VKSource
 from app.models.sources.max_messenger import MAXSource
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/ai", tags=["ai"])
+
+# Limiter берётся из app.state, куда он прикреплён в main.py (TASK-004)
+_limiter = Limiter(key_func=get_remote_address)
 
 
 class GenerateRequest(BaseModel):
@@ -22,7 +31,12 @@ class GenerateRequest(BaseModel):
 
 
 @router.post("/generate")
-async def generate_text(body: GenerateRequest):
+@_limiter.limit(f"{AI_RATE_LIMIT_PER_MINUTE}/minute")
+async def generate_text(request: Request, body: GenerateRequest):
+    # Проверка аутентификации: сессия создаётся при входе в Admin (TASK-004)
+    if not request.session.get("user_id"):
+        return {"ok": False, "error": "Требуется авторизация"}
+
     with SessionLocal() as db:
         provider = db.query(AIProvider).filter_by(is_active=True).first()
         if not provider:

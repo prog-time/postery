@@ -2,8 +2,14 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.middleware.sessions import SessionMiddleware
 
+from app.config import SECRET_KEY
 from app.database import engine, Base, SessionLocal
 from app.admin import create_admin
 from app.routers.main import router
@@ -14,6 +20,9 @@ from app.worker import run_worker
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 Base.metadata.create_all(bind=engine)
+
+# Rate limiter instance shared across the app (TASK-004)
+limiter = Limiter(key_func=get_remote_address)
 
 
 def _migrate() -> None:
@@ -76,8 +85,28 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Postery", lifespan=lifespan)
 
+# SessionMiddleware на уровне основного приложения — даёт доступ к request.session
+# в FastAPI-роутерах (/api/*), не только внутри Admin sub-app (TASK-004)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+# slowapi: прикрепляем limiter к app.state, регистрируем кастомный обработчик
+# (TASK-004). Обработчик возвращает HTTP 200 согласно контракту AI-эндпоинтов.
+app.state.limiter = limiter
+
+
+async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    ip = get_remote_address(request)
+    logging.getLogger(__name__).warning("Rate limit exceeded for IP %s", ip)
+    return JSONResponse(
+        status_code=200,
+        content={"ok": False, "error": "Слишком много запросов — подождите минуту"},
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+
 app.include_router(router)
 
-# SessionMiddleware передаётся внутрь Admin согласно документации
+# Admin sub-app монтируется последним; у него своя SessionMiddleware внутри
 admin = create_admin()
 admin.mount_to(app)
