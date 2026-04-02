@@ -88,6 +88,7 @@ class PostWizardView(EditorAccessMixin, CustomView):
                     },
                 )
             next_channel = _next_channel(post, channel)
+            auto_generate = bool(source and getattr(source, "auto_generate", False))
             return templates.TemplateResponse(
                 request=request,
                 name="posts/step3.html",
@@ -100,6 +101,7 @@ class PostWizardView(EditorAccessMixin, CustomView):
                     "total": len(post.channels),
                     "current_num": post.channels.index(channel) + 1,
                     "wizard_url": wizard_url,
+                    "auto_generate": auto_generate,
                 },
             )
 
@@ -196,6 +198,25 @@ class PostWizardView(EditorAccessMixin, CustomView):
             vk_ids  = [int(x) for x in form.getlist("vk_sources")]
             max_ids = [int(x) for x in form.getlist("max_sources")]
 
+            if not tg_ids and not vk_ids and not max_ids:
+                tg_sources  = db.query(TelegramSource).filter_by(is_active=True).all()
+                vk_sources  = db.query(VKSource).filter_by(is_active=True).all()
+                max_sources = db.query(MAXSource).filter_by(is_active=True).all()
+                selected_tg  = {ch.source_id for ch in post.channels if ch.source_type == "telegram"}
+                selected_vk  = {ch.source_id for ch in post.channels if ch.source_type == "vk"}
+                selected_max = {ch.source_id for ch in post.channels if ch.source_type == "max"}
+                return templates.TemplateResponse(
+                    request=request,
+                    name="posts/step2.html",
+                    context={
+                        "step": 2, "post": post,
+                        "tg_sources": tg_sources, "vk_sources": vk_sources, "max_sources": max_sources,
+                        "selected_tg": selected_tg, "selected_vk": selected_vk, "selected_max": selected_max,
+                        "error": "Выберите хотя бы один источник",
+                        "wizard_url": wizard_url,
+                    },
+                )
+
             # Удалить старые каналы, пересоздать
             for ch in list(post.channels):
                 db.delete(ch)
@@ -210,22 +231,6 @@ class PostWizardView(EditorAccessMixin, CustomView):
 
             db.commit()
             db.refresh(post)
-
-            if not post.channels:
-                tg_sources  = db.query(TelegramSource).filter_by(is_active=True).all()
-                vk_sources  = db.query(VKSource).filter_by(is_active=True).all()
-                max_sources = db.query(MAXSource).filter_by(is_active=True).all()
-                return templates.TemplateResponse(
-                    request=request,
-                    name="posts/step2.html",
-                    context={
-                        "step": 2, "post": post,
-                        "tg_sources": tg_sources, "vk_sources": vk_sources, "max_sources": max_sources,
-                        "selected_tg": set(), "selected_vk": set(), "selected_max": set(),
-                        "error": "Выберите хотя бы один источник",
-                        "wizard_url": wizard_url,
-                    },
-                )
 
             first = post.channels[0]
             return RedirectResponse(

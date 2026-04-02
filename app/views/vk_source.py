@@ -98,6 +98,7 @@ class VKSourceWizardView(CustomView):
                 "group_id":              source.group_id,
                 "ai_prompt_title":       source.ai_prompt_title,
                 "ai_prompt_description": source.ai_prompt_description,
+                "auto_generate":         source.auto_generate,
                 "is_active":             source.is_active,
             }
 
@@ -112,6 +113,7 @@ class VKSourceWizardView(CustomView):
         group_id_raw = (form.get("group_id") or "").strip()
         ai_prompt_title       = (form.get("ai_prompt_title") or "").strip() or None
         ai_prompt_description = (form.get("ai_prompt_description") or "").strip() or None
+        auto_generate = form.get("auto_generate") == "on"
         is_active    = form.get("is_active") == "on"
 
         errors: dict[str, str] = {}
@@ -137,6 +139,7 @@ class VKSourceWizardView(CustomView):
             source.group_id              = group_id
             source.ai_prompt_title       = ai_prompt_title
             source.ai_prompt_description = ai_prompt_description
+            source.auto_generate         = auto_generate
             source.is_active             = is_active
             if access_token:
                 source.access_token = access_token

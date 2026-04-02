@@ -91,6 +91,7 @@ class MAXSourceWizardView(CustomView):
                 "chat_id":               source.chat_id,
                 "ai_prompt_title":       source.ai_prompt_title,
                 "ai_prompt_description": source.ai_prompt_description,
+                "auto_generate":         source.auto_generate,
                 "is_active":             source.is_active,
             }
 
@@ -105,6 +106,7 @@ class MAXSourceWizardView(CustomView):
         chat_id   = (form.get("chat_id") or "").strip()
         ai_prompt_title       = (form.get("ai_prompt_title") or "").strip() or None
         ai_prompt_description = (form.get("ai_prompt_description") or "").strip() or None
+        auto_generate = form.get("auto_generate") == "on"
         is_active = form.get("is_active") == "on"
 
         errors: dict[str, str] = {}
@@ -123,6 +125,7 @@ class MAXSourceWizardView(CustomView):
             source.chat_id               = chat_id
             source.ai_prompt_title       = ai_prompt_title
             source.ai_prompt_description = ai_prompt_description
+            source.auto_generate         = auto_generate
             source.is_active             = is_active
             if bot_token:
                 source.bot_token = bot_token

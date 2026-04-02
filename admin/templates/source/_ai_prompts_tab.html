@@ -1,5 +1,5 @@
 {#
-  Вкладка "AI промпты" для форм редактирования источников.
+  Вкладка "Настройки AI" для форм редактирования источников.
   Переменные из контекста: source, form
 #}
 <div class="mb-3">
@@ -11,11 +11,24 @@
     <small class="form-hint">Инструкция для AI при обработке заголовка. Поддерживается Markdown.</small>
 </div>
 
-<div class="mb-0">
+<div class="mb-3">
     <label class="form-label">AI промпт для описания</label>
     <textarea name="ai_prompt_description" rows="6"
               class="form-control font-monospace"
               placeholder="Например: Перепиши текст в деловом стиле. Используй **жирный** для ключевых слов."
               >{{ form.ai_prompt_description if form.ai_prompt_description is defined else (source.ai_prompt_description or '') }}</textarea>
     <small class="form-hint">Инструкция для AI при обработке текста поста. Поддерживается Markdown.</small>
+</div>
+
+<div class="mb-0">
+    <label class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" name="auto_generate"
+               {% if form.auto_generate is defined %}
+                   {% if form.auto_generate == 'on' %}checked{% endif %}
+               {% elif source and source.auto_generate %}
+                   checked
+               {% endif %}>
+        <span class="form-check-label">Генерировать для каждой записи</span>
+    </label>
+    <small class="form-hint">При создании записи AI автоматически сгенерирует заголовок и описание для этого источника</small>
 </div>

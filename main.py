@@ -37,6 +37,10 @@ def _migrate() -> None:
         # TASK-002: retry mechanism
         ("post_channels",    "attempt",               "INTEGER NOT NULL DEFAULT 0"),
         ("post_channels",    "retry_after",           "DATETIME"),
+        # TASK-008: auto-generate flag on sources
+        ("telegram_sources", "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
+        ("vk_sources",       "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
+        ("max_sources",      "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
     ]
     with engine.connect() as conn:
         for table, column, col_type in migrations:

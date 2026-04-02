@@ -77,6 +77,7 @@ erDiagram
         int thread_id
         text ai_prompt_title
         text ai_prompt_description
+        bool auto_generate
         bool is_active
         datetime created_at
     }
@@ -87,6 +88,7 @@ erDiagram
         int group_id
         text ai_prompt_title
         text ai_prompt_description
+        bool auto_generate
         bool is_active
         datetime created_at
     }
@@ -97,6 +99,7 @@ erDiagram
         string chat_id
         text ai_prompt_title
         text ai_prompt_description
+        bool auto_generate
         bool is_active
         datetime created_at
     }
@@ -207,6 +210,7 @@ erDiagram
 | thread_id | INTEGER | Yes | Topic ID for supergroup forums (optional) |
 | ai_prompt_title | TEXT | Yes | System prompt for AI title rewrite. Added via `_migrate()`. |
 | ai_prompt_description | TEXT | Yes | System prompt for AI description rewrite. Added via `_migrate()`. |
+| auto_generate | BOOLEAN | No | If true, AI auto-generates title+description when wizard step 3 opens for this source. Default `False`. Added via `_migrate()` (TASK-008). |
 | is_active | BOOLEAN | No | Inactive sources excluded from post wizard step 2 |
 | created_at | DATETIME | No | Creation timestamp |
 
@@ -224,6 +228,7 @@ erDiagram
 | group_id | INTEGER | No | Numeric community ID (positive, without minus) |
 | ai_prompt_title | TEXT | Yes | System prompt for AI title rewrite. Added via `_migrate()`. |
 | ai_prompt_description | TEXT | Yes | System prompt for AI description rewrite. Added via `_migrate()`. |
+| auto_generate | BOOLEAN | No | If true, AI auto-generates title+description when wizard step 3 opens for this source. Default `False`. Added via `_migrate()` (TASK-008). |
 | is_active | BOOLEAN | No | Active flag |
 | created_at | DATETIME | No | Creation timestamp |
 
@@ -243,6 +248,7 @@ erDiagram
 | chat_id | VARCHAR(128) | No | Numeric channel/chat ID |
 | ai_prompt_title | TEXT | Yes | System prompt for AI title rewrite. Added via `_migrate()`. |
 | ai_prompt_description | TEXT | Yes | System prompt for AI description rewrite. Added via `_migrate()`. |
+| auto_generate | BOOLEAN | No | If true, AI auto-generates title+description when wizard step 3 opens for this source. Default `False`. Added via `_migrate()` (TASK-008). |
 | is_active | BOOLEAN | No | Active flag |
 | created_at | DATETIME | No | Creation timestamp |
 

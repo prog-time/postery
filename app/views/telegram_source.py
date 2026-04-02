@@ -95,13 +95,14 @@ class TelegramSourceWizardView(CustomView):
             if not source:
                 return RedirectResponse(_LIST_URL, status_code=302)
             source_data = {
-                "id":                   source.id,
-                "name":                 source.name,
-                "chat_id":              source.chat_id,
-                "thread_id":            source.thread_id,
-                "ai_prompt_title":      source.ai_prompt_title,
+                "id":                    source.id,
+                "name":                  source.name,
+                "chat_id":               source.chat_id,
+                "thread_id":             source.thread_id,
+                "ai_prompt_title":       source.ai_prompt_title,
                 "ai_prompt_description": source.ai_prompt_description,
-                "is_active":            source.is_active,
+                "auto_generate":         source.auto_generate,
+                "is_active":             source.is_active,
             }
 
         if request.method == "POST":
@@ -116,6 +117,7 @@ class TelegramSourceWizardView(CustomView):
         thread_id_raw = (form.get("thread_id") or "").strip()
         ai_prompt_title       = (form.get("ai_prompt_title") or "").strip() or None
         ai_prompt_description = (form.get("ai_prompt_description") or "").strip() or None
+        auto_generate = form.get("auto_generate") == "on"
         is_active = form.get("is_active") == "on"
 
         errors: dict[str, str] = {}
@@ -140,9 +142,10 @@ class TelegramSourceWizardView(CustomView):
             source.name                 = name
             source.chat_id              = chat_id
             source.thread_id            = thread_id
-            source.ai_prompt_title      = ai_prompt_title
+            source.ai_prompt_title       = ai_prompt_title
             source.ai_prompt_description = ai_prompt_description
-            source.is_active            = is_active
+            source.auto_generate         = auto_generate
+            source.is_active             = is_active
             if bot_token:
                 source.bot_token = bot_token
             db.commit()

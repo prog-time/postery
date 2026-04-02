@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% from "posts/_ai_generate.html" import ai_btn, ai_overlay %}
+{% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
 
 {% block header %}
 <div class="row align-items-center mb-2">
@@ -112,5 +112,10 @@
     </form>
 </div>
 
-{{ ai_overlay() }}
+{{ ai_modals() }}
+{% endblock %}
+
+{% block script %}
+{{ super() }}
+{{ ai_script(auto_generate=auto_generate) }}
 {% endblock %}

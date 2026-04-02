@@ -26,6 +26,9 @@ class TelegramSource(Base):
     ai_prompt_title: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_prompt_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Автоматическая AI-генерация при открытии шага 3 визарда (TASK-008)
+    auto_generate: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
