@@ -308,6 +308,46 @@
     </script>
     <script>
     (function () {
+        const EMPTY_STATES = {
+            'telegram-source': { icon: 'fa-brands fa-telegram',      text: 'Telegram-источников ещё нет',  action: '<a href="/admin/telegram-source/wizard">Добавить первый</a>' },
+            'v-k-source':      { icon: 'fa-brands fa-vk',            text: 'ВКонтакте-источников ещё нет', action: '<a href="/admin/vk-source/wizard">Добавить первый</a>' },
+            'm-a-x-source':    { icon: 'fa-solid fa-comment-dots',   text: 'MAX-источников ещё нет',       action: '<a href="/admin/max-source/wizard">Добавить первый</a>' },
+            'ai-provider':     { icon: 'fa-solid fa-robot',          text: 'AI-провайдеров ещё нет',       action: '<a href="/admin/ai-provider/wizard?type=openai">Добавить первый</a>' },
+            'admin-user':      { icon: 'fa-solid fa-users',          text: 'Пользователей ещё нет',        action: null },
+        };
+
+        const SEARCH_EMPTY = { icon: 'fa-solid fa-magnifying-glass', text: 'Ничего не найдено', action: null };
+
+        function emptyHtml(state, colCount) {
+            const actionHtml = state.action ? `<div class="mt-1" style="font-size:.85rem;">${state.action}</div>` : '';
+            return `<tr><td colspan="${colCount}" class="text-center py-5">
+                <i class="${state.icon}" style="font-size:2rem;color:#94a3b8;display:block;margin-bottom:.75rem;"></i>
+                <div class="text-muted fw-medium">${state.text}</div>
+                ${actionHtml}
+            </td></tr>`;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const table = document.getElementById('dt');
+            if (!table) return;
+            const $t = $(table);
+
+            $t.on('draw.dt', function () {
+                const api = $t.DataTable();
+                const info = api.page.info();
+                if (info.recordsDisplay > 0) return;
+
+                const colCount = api.columns(':visible').count() || 2;
+                const isSearch = (api.search() || '').trim().length > 0;
+                const DEFAULT_EMPTY = { icon: 'fa-solid fa-inbox', text: 'Записей ещё нет', action: null };
+                const state = isSearch ? SEARCH_EMPTY : (EMPTY_STATES[model.identity] || DEFAULT_EMPTY);
+
+                $t.find('tbody').html(emptyHtml(state, colCount));
+            });
+        });
+    })();
+
+    (function () {
         const SOURCE_IDENTITIES = ['telegram-source', 'vk-source', 'max-source'];
 
         // Скрыть карандаш у источников (редактирование доступно через клик по строке)

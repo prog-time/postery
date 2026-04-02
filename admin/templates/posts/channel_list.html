@@ -197,11 +197,14 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
+                                <td colspan="8" class="text-center py-5">
                                     {% if search %}
-                                        Ничего не найдено по запросу «{{ search }}»
+                                        <i class="fa-solid fa-magnifying-glass" style="font-size:2rem;color:#94a3b8;display:block;margin-bottom:.75rem;"></i>
+                                        <div class="text-muted fw-medium">Ничего не найдено</div>
                                     {% else %}
-                                        Постов ещё нет. <a href="/admin/posts/wizard">Создать первый</a>
+                                        <i class="fa-solid fa-newspaper" style="font-size:2rem;color:#94a3b8;display:block;margin-bottom:.75rem;"></i>
+                                        <div class="text-muted fw-medium">Постов ещё нет</div>
+                                        <div class="mt-1" style="font-size:.85rem;"><a href="/admin/posts/wizard">Создать первый</a></div>
                                     {% endif %}
                                 </td>
                             </tr>
