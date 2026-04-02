@@ -6,7 +6,7 @@ from starlette.responses import Response, RedirectResponse
 from starlette.templating import Jinja2Templates
 from starlette_admin.views import CustomView
 
-from app.config import BASE_DIR
+from app.config import BASE_DIR, ALLOWED_IMAGE_EXTENSIONS, MAX_IMAGE_SIZE_MB
 from app.database import SessionLocal
 from app.models.post import Post, PostImage, PostChannel, PostStatus, ChannelStatus
 from app.models.sources.telegram import TelegramSource
@@ -134,21 +134,57 @@ class PostWizardView(EditorAccessMixin, CustomView):
                 db.add(post)
                 db.flush()
 
-            # Загрузка изображений
+            # Загрузка изображений — с валидацией типа и размера (TASK-003)
             images = form.getlist("images")
+            max_bytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
+            validated: list[tuple] = []  # (img, content) — пары прошедших проверку
+
             for img in images:
-                if hasattr(img, "filename") and img.filename:
-                    upload_dir = UPLOAD_DIR / str(post.id)
-                    upload_dir.mkdir(parents=True, exist_ok=True)
-                    dest = upload_dir / img.filename
-                    content = await img.read()
-                    dest.write_bytes(content)
-                    order = len(post.images)
-                    db.add(PostImage(
-                        post_id=post.id,
-                        file_path=str(dest.relative_to(BASE_DIR)),
-                        order=order,
-                    ))
+                if not (hasattr(img, "filename") and img.filename):
+                    continue
+                ext = Path(img.filename).suffix.lower()
+                if ext not in ALLOWED_IMAGE_EXTENSIONS:
+                    db.rollback()
+                    post_ctx = db.get(Post, int(post_id)) if post_id else None
+                    return templates.TemplateResponse(
+                        request=request,
+                        name="posts/step1.html",
+                        context={
+                            "step": 1,
+                            "post": post_ctx,
+                            "error": f"Недопустимый формат файла: «{img.filename}». Разрешены: JPG, JPEG, PNG, GIF, WEBP.",
+                            "form": dict(form),
+                            "wizard_url": wizard_url,
+                        },
+                    )
+                content = await img.read()
+                if len(content) > max_bytes:
+                    db.rollback()
+                    post_ctx = db.get(Post, int(post_id)) if post_id else None
+                    return templates.TemplateResponse(
+                        request=request,
+                        name="posts/step1.html",
+                        context={
+                            "step": 1,
+                            "post": post_ctx,
+                            "error": f"Файл «{img.filename}» превышает допустимый размер {MAX_IMAGE_SIZE_MB} МБ.",
+                            "form": dict(form),
+                            "wizard_url": wizard_url,
+                        },
+                    )
+                validated.append((img, content))
+
+            for img, content in validated:
+                upload_dir = UPLOAD_DIR / str(post.id)
+                upload_dir.mkdir(parents=True, exist_ok=True)
+                dest = upload_dir / img.filename
+                dest.write_bytes(content)
+                order = len(post.images)
+                db.add(PostImage(
+                    post_id=post.id,
+                    file_path=str(dest.relative_to(BASE_DIR)),
+                    order=order,
+                ))
 
             db.commit()
             return RedirectResponse(f"{wizard_url}?post_id={post.id}&step=2", status_code=302)

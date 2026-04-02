@@ -22,3 +22,7 @@ STATICS_DIR   = str(BASE_DIR / "admin" / "statics")
 # Retry settings for the background publishing worker (TASK-002)
 MAX_ATTEMPTS = 3          # maximum publish attempts before marking channel as FAILED
 RETRY_DELAY_MINUTES = 5   # base delay between retries; actual delay = attempt * RETRY_DELAY_MINUTES
+
+# Image upload validation (TASK-003)
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_IMAGE_SIZE_MB = 10
