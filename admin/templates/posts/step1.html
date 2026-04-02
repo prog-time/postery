@@ -1,0 +1,230 @@
+{% extends "layout.html" %}
+
+{% block header %}
+<div class="row align-items-center mb-2">
+    <div class="col">
+        <h2 class="page-title">{{ "Редактировать пост" if post else "Новый пост" }}</h2>
+    </div>
+</div>
+{% include "posts/_progress.html" %}
+{% endblock %}
+
+{% block head_css %}
+<style>
+/* ── Tag input ─────────────────────────────────────────────────────────── */
+.tag-input-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    align-items: center;
+    min-height: 42px;
+    padding: .4rem .6rem;
+    border: 1px solid var(--tblr-border-color, #d0d7de);
+    border-radius: var(--tblr-border-radius, .375rem);
+    background: #fff;
+    cursor: text;
+    transition: border-color .15s, box-shadow .15s;
+}
+.tag-input-wrap:focus-within {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 .2rem rgba(99,102,241,.18);
+}
+.tag-input-wrap .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .18rem .55rem;
+    background: rgba(99,102,241,.12);
+    color: #4338ca;
+    border-radius: 20px;
+    font-size: .8rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.tag-input-wrap .tag-chip button {
+    background: none;
+    border: none;
+    padding: 0;
+    line-height: 1;
+    font-size: .75rem;
+    color: #6366f1;
+    cursor: pointer;
+    opacity: .7;
+}
+.tag-input-wrap .tag-chip button:hover { opacity: 1; }
+.tag-input-wrap input {
+    border: none;
+    outline: none;
+    flex: 1;
+    min-width: 120px;
+    font-size: .875rem;
+    background: transparent;
+    padding: .1rem .2rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-12">
+
+    <form method="POST"
+          action="{{ wizard_url }}?{% if post %}post_id={{ post.id }}&{% endif %}step=1"
+          enctype="multipart/form-data"
+          id="wizard-form">
+
+        {% if error %}
+        <div class="alert alert-danger mb-3">
+            <i class="fa fa-circle-exclamation me-2"></i>{{ error }}
+        </div>
+        {% endif %}
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fa fa-pen me-2 text-muted"></i>Содержание
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label required">Заголовок</label>
+                    <input type="text" name="title" class="form-control form-control-lg"
+                           placeholder="Введите заголовок поста"
+                           value="{{ post.title if post else (form.title if form else '') }}"
+                           required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Текст</label>
+                    <textarea name="description" class="form-control" rows="8"
+                              placeholder="Текст поста...">{{ post.description if post else (form.description if form else '') }}</textarea>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label">Теги</label>
+                    {# Скрытый input — реальное значение формы #}
+                    <input type="hidden" name="tags" id="tags-value"
+                           value="{{ post.tags if post else (form.tags if form else '') }}">
+                    {# Визуальный тег-инпут #}
+                    <div class="tag-input-wrap" id="tag-wrap">
+                        <input id="tag-input" type="text" placeholder="Добавьте тег и нажмите Enter">
+                    </div>
+                    <div class="form-hint">Enter или запятая — добавить тег</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fa fa-images me-2 text-muted"></i>Изображения
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if post and post.images %}
+                <div class="row g-2 mb-3">
+                    {% for img in post.images %}
+                    <div class="col-auto">
+                        <img src="/{{ img.file_path }}" class="rounded"
+                             style="height:72px;width:72px;object-fit:cover;">
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div id="upload-area" class="border rounded-3 p-4 text-center"
+                     style="border-style:dashed!important;cursor:pointer;transition:background .2s;">
+                    <i class="fa fa-cloud-arrow-up fa-2x text-muted mb-2 d-block"></i>
+                    <div class="text-muted">Нажмите или перетащите изображения сюда</div>
+                    <div class="text-muted small mt-1">PNG, JPG, WEBP — до 10 МБ каждое</div>
+                    <input type="file" name="images" id="images-input"
+                           multiple accept="image/*" class="d-none">
+                </div>
+                <div id="preview-row" class="row g-2 mt-2"></div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="/admin" class="btn btn-ghost-secondary">
+                <i class="fa fa-arrow-left me-1"></i>Отмена
+            </a>
+            <button type="submit" class="btn btn-primary px-4">
+                Далее: источники&nbsp;<i class="fa fa-arrow-right ms-1"></i>
+            </button>
+        </div>
+    </form>
+</div>
+
+{% block script %}
+<script>
+/* ── Tag input ─────────────────────────────────────────────── */
+const wrap      = document.getElementById('tag-wrap');
+const tagInput  = document.getElementById('tag-input');
+const tagsValue = document.getElementById('tags-value');
+
+let tags = tagsValue.value
+    ? tagsValue.value.split(',').map(t => t.trim()).filter(Boolean)
+    : [];
+
+function renderTags() {
+    wrap.querySelectorAll('.tag-chip').forEach(el => el.remove());
+    tags.forEach((tag, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.innerHTML = `${tag}<button type="button" data-i="${i}" aria-label="Remove">×</button>`;
+        wrap.insertBefore(chip, tagInput);
+    });
+    tagsValue.value = tags.join(', ');
+}
+
+wrap.addEventListener('click', () => tagInput.focus());
+
+wrap.addEventListener('click', e => {
+    const btn = e.target.closest('[data-i]');
+    if (btn) { tags.splice(+btn.dataset.i, 1); renderTags(); }
+});
+
+function addTag(raw) {
+    const val = raw.trim().replace(/,+$/, '').trim();
+    if (val && !tags.includes(val)) { tags.push(val); }
+    renderTags();
+    tagInput.value = '';
+}
+
+tagInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput.value); }
+    if (e.key === ',' )    { e.preventDefault(); addTag(tagInput.value); }
+    if (e.key === 'Backspace' && !tagInput.value.length && tags.length) {
+        tags.pop(); renderTags();
+    }
+});
+tagInput.addEventListener('blur', () => { if (tagInput.value) addTag(tagInput.value); });
+
+renderTags();
+
+/* ── Image upload preview ──────────────────────────────────── */
+const area    = document.getElementById('upload-area');
+const imgInput = document.getElementById('images-input');
+const preview = document.getElementById('preview-row');
+
+area.addEventListener('click',    () => imgInput.click());
+area.addEventListener('dragover',  e => { e.preventDefault(); area.style.background = '#f1f5f9'; });
+area.addEventListener('dragleave', () => { area.style.background = ''; });
+area.addEventListener('drop', e => { e.preventDefault(); area.style.background = ''; renderImages(e.dataTransfer.files); });
+imgInput.addEventListener('change', () => renderImages(imgInput.files));
+
+function renderImages(files) {
+    [...files].forEach(f => {
+        const r = new FileReader();
+        r.onload = e => {
+            const d = document.createElement('div');
+            d.className = 'col-auto';
+            d.innerHTML = `<img src="${e.target.result}" class="rounded" style="height:72px;width:72px;object-fit:cover;">`;
+            preview.appendChild(d);
+        };
+        r.readAsDataURL(f);
+    });
+}
+</script>
+{% endblock %}
+
+{% endblock %}

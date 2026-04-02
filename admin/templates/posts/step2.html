@@ -1,0 +1,128 @@
+{% extends "layout.html" %}
+
+{% block header %}
+<div class="row align-items-center mb-2">
+    <div class="col">
+        <h2 class="page-title">Выбор источников</h2>
+        <div class="text-muted small mt-1">{{ post.title }}</div>
+    </div>
+</div>
+{% include "posts/_progress.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-12">
+
+    <form method="POST" action="{{ wizard_url }}?post_id={{ post.id }}&step=2">
+
+        {% if error %}
+        <div class="alert alert-danger mb-3">
+            <i class="fa fa-circle-exclamation me-2"></i>{{ error }}
+        </div>
+        {% endif %}
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fa-brands fa-telegram me-2" style="color:#0088cc;"></i>Telegram
+                </h3>
+            </div>
+            {% if tg_sources %}
+            <div class="list-group list-group-flush">
+                {% for src in tg_sources %}
+                <label class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3"
+                       style="cursor:pointer;">
+                    <input type="checkbox" name="telegram_sources" value="{{ src.id }}"
+                           class="form-check-input m-0 flex-shrink-0"
+                           {% if src.id in selected_tg %}checked{% endif %}>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">{{ src.name }}</div>
+                        <div class="text-muted small">{{ src.chat_id }}</div>
+                    </div>
+                    <span class="badge bg-blue-lt">TG</span>
+                </label>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card-body text-center text-muted py-5">
+                <i class="fa fa-circle-info fa-2x mb-3 d-block"></i>
+                Нет активных Telegram-источников.
+                <a href="/admin/telegram-source/create" class="d-block mt-2">Добавить источник</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fa-brands fa-vk me-2" style="color:#4680c2;"></i>ВКонтакте
+                </h3>
+            </div>
+            {% if vk_sources %}
+            <div class="list-group list-group-flush">
+                {% for src in vk_sources %}
+                <label class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3"
+                       style="cursor:pointer;">
+                    <input type="checkbox" name="vk_sources" value="{{ src.id }}"
+                           class="form-check-input m-0 flex-shrink-0"
+                           {% if src.id in selected_vk %}checked{% endif %}>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">{{ src.name }}</div>
+                        <div class="text-muted small">group_id: {{ src.group_id }}</div>
+                    </div>
+                    <span class="badge" style="background:#e8f0fb;color:#4680c2;">VK</span>
+                </label>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card-body text-center text-muted py-5">
+                <i class="fa fa-circle-info fa-2x mb-3 d-block"></i>
+                Нет активных VK-источников.
+                <a href="/admin/vk-source/create" class="d-block mt-2">Добавить источник</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fa-solid fa-message me-2" style="color:#5b5ea6;"></i>MAX Мессенджер
+                </h3>
+            </div>
+            {% if max_sources %}
+            <div class="list-group list-group-flush">
+                {% for src in max_sources %}
+                <label class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3"
+                       style="cursor:pointer;">
+                    <input type="checkbox" name="max_sources" value="{{ src.id }}"
+                           class="form-check-input m-0 flex-shrink-0"
+                           {% if src.id in selected_max %}checked{% endif %}>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">{{ src.name }}</div>
+                        <div class="text-muted small">chat_id: {{ src.chat_id }}</div>
+                    </div>
+                    <span class="badge" style="background:#ededf7;color:#5b5ea6;">MAX</span>
+                </label>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card-body text-center text-muted py-5">
+                <i class="fa fa-circle-info fa-2x mb-3 d-block"></i>
+                Нет активных MAX-источников.
+                <a href="/admin/max-source/create" class="d-block mt-2">Добавить источник</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ wizard_url }}?post_id={{ post.id }}&step=1"
+               class="btn btn-ghost-secondary">
+                <i class="fa fa-arrow-left me-1"></i>Назад
+            </a>
+            <button type="submit" class="btn btn-primary px-4">
+                Далее: настройка&nbsp;<i class="fa fa-arrow-right ms-1"></i>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

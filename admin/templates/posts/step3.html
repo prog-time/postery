@@ -1,0 +1,116 @@
+{% extends "layout.html" %}
+{% from "posts/_ai_generate.html" import ai_btn, ai_overlay %}
+
+{% block header %}
+<div class="row align-items-center mb-2">
+    <div class="col">
+        <h2 class="page-title">
+            Настройка:
+            <span style="color:#6366f1;">{{ source.name if source else channel.source_type }}</span>
+        </h2>
+        <div class="text-muted small mt-1">
+            Источник {{ current_num }} из {{ total }} &mdash; {{ post.title }}
+        </div>
+    </div>
+</div>
+{% include "posts/_progress.html" %}
+{% endblock %}
+
+{% block content %}
+{# Контекст источника для AI-генерации #}
+<div id="ai-generate-ctx" hidden
+     data-source-type="{{ channel.source_type }}"
+     data-source-id="{{ channel.source_id }}"></div>
+
+<div class="col-12">
+
+    {# Метка источника #}
+    <div class="card mb-3" style="border-left: 3px solid #6366f1;">
+        <div class="card-body py-3 d-flex align-items-center gap-3">
+            {% if channel.source_type == "telegram" %}
+                <i class="fa-brands fa-telegram fa-lg" style="color:#0088cc;"></i>
+            {% elif channel.source_type == "vk" %}
+                <i class="fa-brands fa-vk fa-lg" style="color:#4680c2;"></i>
+            {% elif channel.source_type == "max" %}
+                <i class="fa-solid fa-message fa-lg" style="color:#5b5ea6;"></i>
+            {% else %}
+                <i class="fa fa-share-nodes fa-lg text-muted"></i>
+            {% endif %}
+            <div class="flex-grow-1">
+                <div class="fw-semibold">{{ source.name if source else channel.source_type }}</div>
+                {% if source and source.chat_id %}
+                <div class="text-muted small">{{ source.chat_id }}</div>
+                {% endif %}
+            </div>
+            <span class="badge bg-purple-lt">{{ current_num }} / {{ total }}</span>
+        </div>
+    </div>
+
+    <form method="POST"
+          action="{{ wizard_url }}?post_id={{ post.id }}&step=3&channel_id={{ channel.id }}">
+
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h3 class="card-title mb-0">Содержание для этого источника</h3>
+                <span class="badge bg-blue-lt text-blue small">
+                    Пустое поле = берётся из оригинала
+                </span>
+            </div>
+            <div class="card-body">
+
+                {# Оригинал для справки #}
+                <div class="mb-4 p-3 rounded-2 bg-light border">
+                    <div class="text-muted small fw-semibold mb-1 text-uppercase" style="letter-spacing:.05em;">
+                        <i class="fa fa-file-lines me-1"></i>Оригинал
+                    </div>
+                    <div class="fw-semibold">{{ post.title }}</div>
+                    {% if post.description %}
+                    <div class="text-muted small mt-1"
+                         style="white-space:pre-wrap;max-height:80px;overflow:hidden;">{{ post.description[:250] }}{% if post.description|length > 250 %}…{% endif %}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label d-flex align-items-center">
+                        Заголовок
+                        {{ ai_btn("title") }}
+                    </label>
+                    <input type="text" name="title" class="form-control"
+                           value="{{ channel.title or post.title }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label d-flex align-items-center">
+                        Текст
+                        {{ ai_btn("description") }}
+                    </label>
+                    <textarea name="description" class="form-control" rows="7"
+                              >{{ channel.description or post.description or '' }}</textarea>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label">Дата и время публикации</label>
+                    <input type="datetime-local" name="scheduled_at" class="form-control"
+                           value="{{ channel.scheduled_at.strftime('%Y-%m-%dT%H:%M') if channel.scheduled_at else '' }}">
+                    <div class="form-hint">Оставьте пустым — публикация сразу после нажатия «Готово»</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ wizard_url }}?post_id={{ post.id }}&step=2"
+               class="btn btn-ghost-secondary">
+                <i class="fa fa-arrow-left me-1"></i>К источникам
+            </a>
+            <button type="submit" class="btn btn-primary px-4">
+                {% if next_channel %}
+                    Следующий&nbsp;<i class="fa fa-arrow-right ms-1"></i>
+                {% else %}
+                    <i class="fa fa-check me-1"></i>Готово
+                {% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+
+{{ ai_overlay() }}
+{% endblock %}
