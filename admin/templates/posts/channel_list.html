@@ -1,0 +1,521 @@
+{% extends "layout.html" %}
+
+{% block header %}
+<div class="d-flex justify-content-between align-items-center">
+    <h1>Все посты</h1>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for(__name__ ~ ':index') }}">Админ</a></li>
+        <li class="breadcrumb-item active">Все посты</li>
+    </ol>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+
+                {# ── Шапка: поиск + кнопка ──────────────────────────────────── #}
+                <div class="card-header d-flex align-items-center gap-3">
+                    <form method="GET" action="{{ list_url }}" class="d-flex" style="width:260px;">
+                        <div class="input-icon w-100">
+                            <span class="input-icon-addon">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24"
+                                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                     fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <circle cx="10" cy="10" r="7"/>
+                                    <line x1="21" y1="21" x2="15" y2="15"/>
+                                </svg>
+                            </span>
+                            <input type="search" name="q" value="{{ search }}"
+                                   class="form-control" placeholder="Поиск по заголовку…"
+                                   aria-label="Поиск"/>
+                        </div>
+                    </form>
+
+                    <div class="ms-auto">
+                        <a href="/admin/posts/wizard" class="btn btn-primary">
+                            <i class="fa-solid fa-plus me-2"></i>Создать пост
+                        </a>
+                    </div>
+                </div>
+
+                {# ── Таблица ────────────────────────────────────────────────── #}
+                <div class="table-responsive">
+                    <table class="table table-vcenter table-hover text-nowrap mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:36px;" class="text-muted">ID</th>
+                                <th>Заголовок</th>
+                                <th style="width:180px;">Источник</th>
+                                <th style="width:130px;">Статус поста</th>
+                                <th style="width:140px;">Статус канала</th>
+                                <th style="width:150px;">Запланирован</th>
+                                <th style="width:140px;">Создан</th>
+                                <th style="width:80px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% if rows %}
+                            {% for row in rows %}
+                            <tr>
+                                <td class="text-muted">{{ row.post_id }}</td>
+
+                                {# Заголовок + теги #}
+                                <td>
+                                    <div class="fw-semibold" style="max-width:340px;white-space:normal;line-height:1.3;">
+                                        {{ row.post_title }}
+                                    </div>
+                                    {% if row.post_tags %}
+                                        <div class="mt-1" style="white-space:normal;">
+                                        {% for tag in row.post_tags.split(',') %}
+                                            <span class="badge bg-blue-lt text-blue me-1" style="font-size:.7rem;">{{ tag.strip() }}</span>
+                                        {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </td>
+
+                                {# Источник #}
+                                <td>
+                                    {% if row.source_name %}
+                                        <span class="d-flex align-items-center gap-1">
+                                            <i class="{{ row.source_icon }}" style="font-size:.85rem;color:#64748b;"></i>
+                                            <span>{{ row.source_name }}</span>
+                                        </span>
+                                        <small class="text-muted">{{ row.source_label }}</small>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+
+                                {# Статус поста #}
+                                <td>
+                                    {% set ps = row.post_status %}
+                                    {% if ps == 'draft' %}
+                                        <span class="status-badge" style="color:#94a3b8;background:rgba(148,163,184,.13);">
+                                            <i class="fa-solid fa-pen-line" style="font-size:.7rem;"></i>Черновик
+                                        </span>
+                                    {% elif ps == 'ready' %}
+                                        <span class="status-badge" style="color:#6366f1;background:rgba(99,102,241,.13);">
+                                            <i class="fa-solid fa-circle-check" style="font-size:.7rem;"></i>Готов
+                                        </span>
+                                    {% elif ps == 'published' %}
+                                        <span class="status-badge" style="color:#22c55e;background:rgba(34,197,94,.13);">
+                                            <i class="fa-solid fa-paper-plane" style="font-size:.7rem;"></i>Опубликован
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                {# Статус канала #}
+                                <td>
+                                    {% set cs = row.ch_status %}
+                                    {% if cs == 'pending' %}
+                                        <span class="status-badge" style="color:#f59e0b;background:rgba(245,158,11,.13);">
+                                            <i class="fa-solid fa-clock" style="font-size:.7rem;"></i>Ожидает
+                                        </span>
+                                    {% elif cs == 'published' %}
+                                        <span class="status-badge" style="color:#22c55e;background:rgba(34,197,94,.13);">
+                                            <i class="fa-solid fa-paper-plane" style="font-size:.7rem;"></i>Опубликован
+                                        </span>
+                                    {% elif cs == 'failed' %}
+                                        <span class="status-badge" style="color:#ef4444;background:rgba(239,68,68,.13);"
+                                              {% if row.error_msg %}title="{{ row.error_msg }}"{% endif %}>
+                                            <i class="fa-solid fa-circle-xmark" style="font-size:.7rem;"></i>Ошибка
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+
+                                {# Запланирован / опубликован #}
+                                <td class="text-muted" style="font-size:.85rem;">
+                                    {% if row.published_at %}
+                                        {{ row.published_at.strftime('%d.%m.%Y %H:%M') }}
+                                    {% elif row.scheduled_at %}
+                                        {{ row.scheduled_at.strftime('%d.%m.%Y %H:%M') }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+
+                                {# Создан #}
+                                <td class="text-muted" style="font-size:.85rem;">
+                                    {{ row.post_created.strftime('%d.%m.%Y %H:%M') }}
+                                </td>
+
+                                {# Действия #}
+                                <td>
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        {% if row.channel_id %}
+                                        <a href="/admin/posts/wizard?post_id={{ row.post_id }}&step=3&channel_id={{ row.channel_id }}&from_list=1"
+                                           class="row-action-btn row-action-btn--row_action_2_edit"
+                                           title="Редактировать источник">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </a>
+                                        {% else %}
+                                        <a href="/admin/posts/wizard?post_id={{ row.post_id }}&step=1"
+                                           class="row-action-btn row-action-btn--row_action_2_edit"
+                                           title="Редактировать пост">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if row.channel_id %}
+                                        <button type="button"
+                                                class="row-action-btn btn-republish"
+                                                style="color:#6366f1;"
+                                                data-post-id="{{ row.post_id }}"
+                                                data-channel-id="{{ row.channel_id }}"
+                                                data-source-name="{{ row.source_name }}"
+                                                data-post-title="{{ row.post_title }}"
+                                                title="Перепубликовать">
+                                            <i class="fa-solid fa-rotate-right"></i>
+                                        </button>
+                                        {% endif %}
+                                        {% if row.channel_id %}
+                                        <button type="button"
+                                                class="row-action-btn row-action-btn--row_action_3_delete btn-delete"
+                                                data-channel-id="{{ row.channel_id }}"
+                                                data-source-name="{{ row.source_name }}"
+                                                data-post-title="{{ row.post_title }}"
+                                                title="Удалить источник">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                        {% else %}
+                                        <button type="button"
+                                                class="row-action-btn row-action-btn--row_action_3_delete btn-delete"
+                                                data-post-id="{{ row.post_id }}"
+                                                data-post-title="{{ row.post_title }}"
+                                                title="Удалить пост">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    {% if search %}
+                                        Ничего не найдено по запросу «{{ search }}»
+                                    {% else %}
+                                        Постов ещё нет. <a href="/admin/posts/wizard">Создать первый</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {# ── Футер: счётчик + пагинация ─────────────────────────────── #}
+                {% if total_pages > 1 or rows %}
+                <div class="card-footer d-flex align-items-center">
+                    <p class="m-0 text-muted" style="font-size:.8rem;">
+                        Постов: {{ total_posts }}
+                    </p>
+                    {% if total_pages > 1 %}
+                    <nav class="ms-auto">
+                        <ul class="pagination pagination-sm m-0 gap-1">
+                            {% if page > 1 %}
+                                <li class="page-item">
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ page - 1 }}{% if search %}&q={{ search }}{% endif %}">‹</a>
+                                </li>
+                            {% endif %}
+
+                            {% set win_start = [1, page - 1] | max %}
+                            {% set win_end   = [total_pages, page + 1] | min %}
+                            {% set win_start = [1, win_end - 2] | max %}
+
+                            {% if win_start > 1 %}
+                                <li class="page-item">
+                                    <a class="pag-btn" href="{{ list_url }}?page=1{% if search %}&q={{ search }}{% endif %}">1</a>
+                                </li>
+                                {% if win_start > 2 %}<li class="page-item disabled"><span class="pag-sep">···</span></li>{% endif %}
+                            {% endif %}
+
+                            {% for p in range(win_start, win_end + 1) %}
+                                <li class="page-item">
+                                    <a class="pag-btn {% if p == page %}pag-btn--active{% endif %}"
+                                       href="{{ list_url }}?page={{ p }}{% if search %}&q={{ search }}{% endif %}">{{ p }}</a>
+                                </li>
+                            {% endfor %}
+
+                            {% if win_end < total_pages %}
+                                {% if win_end < total_pages - 1 %}<li class="page-item disabled"><span class="pag-sep">···</span></li>{% endif %}
+                                <li class="page-item">
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ total_pages }}{% if search %}&q={{ search }}{% endif %}">{{ total_pages }}</a>
+                                </li>
+                            {% endif %}
+
+                            {% if page < total_pages %}
+                                <li class="page-item">
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ page + 1 }}{% if search %}&q={{ search }}{% endif %}">›</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Форма удаления (скрытая) ─────────────────────────────────────────────── #}
+<form id="delete-form" method="POST" action="{{ list_url }}" style="display:none;">
+    <input type="hidden" name="delete_channel_id" id="delete-channel-id">
+    <input type="hidden" name="delete_post_id"    id="delete-post-id">
+</form>
+
+{# ── Модалка перепубликации ───────────────────────────────────────────────── #}
+<div class="modal modal-blur fade" id="republishModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:480px;" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-rotate-right me-2 text-primary"></i>
+                    Перепубликация
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Пост: <strong id="rp-post-title"></strong><br>
+                    Источник: <strong id="rp-source-name"></strong>
+                </p>
+
+                <label class="form-label fw-semibold">Даты публикации</label>
+                <div id="rp-dates-list"></div>
+
+                <button type="button" id="rp-add-date" class="btn btn-sm btn-outline-secondary mt-2">
+                    <i class="fa-solid fa-plus me-1"></i>Добавить дату
+                </button>
+
+                <div id="rp-error" class="alert alert-danger mt-3 mb-0 py-2 small" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" id="rp-submit" class="btn btn-primary">
+                    <i class="fa-solid fa-rotate-right me-1"></i>Запланировать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .2rem .6rem;
+        border-radius: 20px;
+        font-size: .775rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+    .pag-btn {
+        min-width: 32px;
+        height: 32px;
+        padding: 0 .55rem;
+        border-radius: 7px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        color: #475569;
+        font-size: .82rem;
+        font-weight: 500;
+        cursor: pointer;
+        line-height: 32px;
+        display: inline-block;
+        text-align: center;
+        text-decoration: none;
+        transition: background .12s, border-color .12s, color .12s;
+        white-space: nowrap;
+    }
+    .pag-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #1e293b; }
+    .pag-btn.pag-btn--active {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: #fff;
+        pointer-events: none;
+    }
+    .pag-sep { color: #cbd5e1; font-size: .85rem; padding: 0 .2rem; }
+    table tbody tr { cursor: pointer; }
+    .row-action-btn--row_action_3_delete { color: #ef4444 !important; }
+    .btn-republish,
+    .btn-delete {
+        background: none;
+        border: none;
+        padding: 0 .25rem;
+        line-height: 1;
+    }
+    .btn-republish:focus,
+    .btn-delete:focus {
+        outline: none;
+        box-shadow: none;
+    }
+</style>
+{% endblock %}
+
+{% block script %}
+{{ super() }}
+<script>
+(function () {
+    // Клик по строке → редактирование (через ссылку карандаша в той же строке)
+    document.querySelectorAll('tbody tr').forEach(tr => {
+        tr.addEventListener('click', function (e) {
+            if (e.target.closest('button, a')) return;
+            const editBtn = this.querySelector('.row-action-btn--row_action_2_edit');
+            if (editBtn) window.location.href = editBtn.getAttribute('href');
+        });
+    });
+
+    // ── Перепубликация ────────────────────────────────────────────────────────
+    (function () {
+        const modal      = new bootstrap.Modal(document.getElementById('republishModal'));
+        const datesList  = document.getElementById('rp-dates-list');
+        const errorEl    = document.getElementById('rp-error');
+        const submitBtn  = document.getElementById('rp-submit');
+        let currentPostId    = null;
+        let currentChannelId = null;
+
+        function nowMin() {
+            // Минимально допустимое значение — текущая минута
+            const d = new Date();
+            d.setSeconds(0, 0);
+            return d.toISOString().slice(0, 16);
+        }
+
+        function makeDateRow(value) {
+            // Дефолт — ближайший час вперёд
+            if (!value) {
+                const d = new Date();
+                d.setMinutes(0, 0, 0);
+                d.setHours(d.getHours() + 1);
+                value = d.toISOString().slice(0, 16);
+            }
+            const min = nowMin();
+            const row = document.createElement('div');
+            row.className = 'input-group mb-2';
+            row.innerHTML =
+                `<input type="datetime-local" class="form-control rp-date-input" value="${value}" min="${min}">` +
+                `<button type="button" class="btn btn-outline-danger rp-remove-date" tabindex="-1">` +
+                `<i class="fa-solid fa-xmark"></i></button>`;
+            row.querySelector('.rp-remove-date').addEventListener('click', () => {
+                row.remove();
+                updateRemoveBtns();
+            });
+            return row;
+        }
+
+        function updateRemoveBtns() {
+            const rows = datesList.querySelectorAll('.input-group');
+            rows.forEach(r => {
+                r.querySelector('.rp-remove-date').disabled = rows.length === 1;
+            });
+        }
+
+        function openModal(btn) {
+            currentPostId    = btn.dataset.postId;
+            currentChannelId = btn.dataset.channelId;
+            document.getElementById('rp-post-title').textContent   = btn.dataset.postTitle;
+            document.getElementById('rp-source-name').textContent  = btn.dataset.sourceName;
+            errorEl.style.display = 'none';
+            datesList.innerHTML = '';
+            datesList.appendChild(makeDateRow());
+            updateRemoveBtns();
+            modal.show();
+        }
+
+        document.getElementById('rp-add-date').addEventListener('click', () => {
+            datesList.appendChild(makeDateRow());
+            updateRemoveBtns();
+        });
+
+        submitBtn.addEventListener('click', async () => {
+            errorEl.style.display = 'none';
+            const inputs = datesList.querySelectorAll('.rp-date-input');
+            const dates  = [...inputs].map(i => i.value).filter(Boolean);
+
+            if (!dates.length) {
+                errorEl.textContent = 'Укажите хотя бы одну дату';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const now = new Date();
+            const past = dates.filter(d => new Date(d) <= now);
+            if (past.length) {
+                errorEl.textContent = 'Одна или несколько дат уже прошли — укажите будущее время';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Сохраняем…';
+
+            try {
+                const resp = await fetch('/api/posts/republish', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        post_id:    parseInt(currentPostId),
+                        channel_id: parseInt(currentChannelId),
+                        dates,
+                    }),
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    modal.hide();
+                    window.location.reload();
+                } else {
+                    errorEl.textContent = data.error || 'Ошибка';
+                    errorEl.style.display = 'block';
+                }
+            } catch (e) {
+                errorEl.textContent = 'Ошибка запроса: ' + e.message;
+                errorEl.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-rotate-right me-1"></i>Запланировать';
+            }
+        });
+
+        document.querySelectorAll('.btn-republish').forEach(btn => {
+            btn.addEventListener('click', e => { e.stopPropagation(); openModal(btn); });
+        });
+    })();
+
+    // Кнопка удаления
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const channelId  = this.dataset.channelId;
+            const postId     = this.dataset.postId;
+            const postTitle  = this.dataset.postTitle;
+            const sourceName = this.dataset.sourceName;
+
+            let msg;
+            if (channelId) {
+                msg = `Удалить источник «${sourceName}» из поста «${postTitle}»?`;
+            } else {
+                msg = `Удалить пост «${postTitle}»?`;
+            }
+            if (!confirm(msg)) return;
+
+            document.getElementById('delete-channel-id').value = channelId || '';
+            document.getElementById('delete-post-id').value    = postId    || '';
+            document.getElementById('delete-form').submit();
+        });
+    });
+})();
+</script>
+{% endblock %}

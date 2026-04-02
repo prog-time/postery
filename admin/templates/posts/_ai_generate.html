@@ -1,0 +1,151 @@
+{#
+  Макрос ai_btn(field) — кнопка «Сгенерировать» рядом с лейблом поля.
+  Использование: {{ ai_btn("description") }} или {{ ai_btn("title") }}
+
+  Данные источника берутся из data-атрибутов контейнера #ai-generate-ctx.
+#}
+{% macro ai_btn(field) %}
+<button type="button"
+        class="btn btn-sm btn-outline-secondary ms-2 ai-gen-btn"
+        data-field="{{ field }}"
+        title="Сгенерировать с помощью AI">
+    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI
+</button>
+{% endmacro %}
+
+{# Оверлей прогресса — подключается один раз в конце страницы #}
+{% macro ai_overlay() %}
+<div id="ai-gen-overlay" style="
+    display:none;
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(15,23,42,.55);
+    backdrop-filter:blur(3px);
+    align-items:center;justify-content:center;">
+    <div style="
+        background:#fff;border-radius:12px;
+        padding:2rem 2.5rem;width:340px;
+        box-shadow:0 20px 60px rgba(0,0,0,.3);">
+        <div class="text-center mb-3">
+            <i class="fa-solid fa-wand-magic-sparkles fa-lg text-primary mb-2"></i>
+            <div class="fw-semibold" id="ai-gen-label">Генерация текста…</div>
+        </div>
+        <div class="progress mb-2" style="height:8px;border-radius:4px;">
+            <div id="ai-gen-bar"
+                 class="progress-bar bg-primary progress-bar-animated progress-bar-striped"
+                 style="width:0%;transition:width .3s ease;border-radius:4px;"></div>
+        </div>
+        <div class="text-center text-muted small" id="ai-gen-pct">0%</div>
+        <div id="ai-gen-error" class="alert alert-danger mt-3 mb-0 py-2 small" style="display:none;"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const ctx       = document.getElementById('ai-generate-ctx');
+    const overlay   = document.getElementById('ai-gen-overlay');
+    const bar       = document.getElementById('ai-gen-bar');
+    const pctEl     = document.getElementById('ai-gen-pct');
+    const labelEl   = document.getElementById('ai-gen-label');
+    const errorEl   = document.getElementById('ai-gen-error');
+
+    if (!ctx || !overlay) return;
+
+    const sourceType = ctx.dataset.sourceType;
+    const sourceId   = parseInt(ctx.dataset.sourceId, 10);
+
+    let animTimer = null;
+    let currentPct = 0;
+
+    function setProgress(pct) {
+        currentPct = pct;
+        bar.style.width = pct + '%';
+        pctEl.textContent = Math.round(pct) + '%';
+    }
+
+    function startProgress() {
+        setProgress(0);
+        errorEl.style.display = 'none';
+        labelEl.textContent = 'Генерация текста…';
+        overlay.style.display = 'flex';
+        // Плавно идём до ~88% за ~12 секунд
+        const target = 88;
+        const duration = 12000;
+        const interval = 100;
+        const steps = duration / interval;
+        const increment = target / steps;
+        animTimer = setInterval(() => {
+            if (currentPct < target) setProgress(Math.min(currentPct + increment, target));
+        }, interval);
+    }
+
+    function finishProgress(ok, errorMsg) {
+        clearInterval(animTimer);
+        if (ok) {
+            setProgress(100);
+            bar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+            bar.classList.add('bg-success');
+            labelEl.textContent = 'Готово!';
+            setTimeout(() => closeOverlay(), 500);
+        } else {
+            setProgress(currentPct);
+            bar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+            bar.classList.add('bg-danger');
+            labelEl.textContent = 'Ошибка';
+            errorEl.textContent = errorMsg || 'Неизвестная ошибка';
+            errorEl.style.display = 'block';
+        }
+    }
+
+    function closeOverlay() {
+        overlay.style.display = 'none';
+        bar.style.width = '0%';
+        bar.className = 'progress-bar bg-primary progress-bar-animated progress-bar-striped';
+        errorEl.style.display = 'none';
+        currentPct = 0;
+    }
+
+    // Закрыть по клику на фон (только если не в процессе)
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay && errorEl.style.display !== 'none') closeOverlay();
+    });
+
+    document.querySelectorAll('.ai-gen-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const field = btn.dataset.field;
+            const input = document.querySelector(`[name="${field}"]`);
+            if (!input) return;
+
+            const text = input.value.trim();
+            if (!text) {
+                alert('Поле пустое — заполните текст перед генерацией');
+                return;
+            }
+
+            startProgress();
+
+            try {
+                const resp = await fetch('/api/ai/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: text,
+                        source_type: sourceType,
+                        source_id: sourceId,
+                        field: field,
+                    }),
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    input.value = data.result;
+                    finishProgress(true);
+                } else {
+                    finishProgress(false, data.error);
+                }
+            } catch (e) {
+                finishProgress(false, 'Ошибка запроса: ' + e.message);
+            }
+        });
+    });
+})();
+</script>
+{% endmacro %}

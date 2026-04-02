@@ -1,0 +1,88 @@
+{% extends "layout.html" %}
+{% from "posts/_ai_generate.html" import ai_btn, ai_overlay %}
+
+{% block header %}
+<div class="d-flex justify-content-between align-items-center">
+    <h1>Редактирование</h1>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for(__name__ ~ ':index') }}">Админ</a></li>
+        <li class="breadcrumb-item"><a href="/admin/posts">Все посты</a></li>
+        <li class="breadcrumb-item active">{{ post.title }}</li>
+    </ol>
+</div>
+{% endblock %}
+
+{% block content %}
+{# Контекст источника для AI-генерации #}
+<div id="ai-generate-ctx" hidden
+     data-source-type="{{ channel.source_type }}"
+     data-source-id="{{ channel.source_id }}"></div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-lg-7">
+
+            <form method="POST"
+                  action="{{ wizard_url }}?post_id={{ post.id }}&step=3&channel_id={{ channel.id }}&from_list=1">
+
+                <div class="card">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        {% if channel.source_type == "telegram" %}
+                            <i class="fa-brands fa-telegram" style="color:#0088cc;font-size:1.1rem;"></i>
+                        {% elif channel.source_type == "vk" %}
+                            <i class="fa-brands fa-vk" style="color:#4680c2;font-size:1.1rem;"></i>
+                        {% elif channel.source_type == "max" %}
+                            <i class="fa-solid fa-message" style="color:#5b5ea6;font-size:1.1rem;"></i>
+                        {% endif %}
+                        <div>
+                            <h3 class="card-title mb-0">{{ source.name if source else channel.source_type }}</h3>
+                            {% if source and source.chat_id %}
+                                <div class="text-muted small">{{ source.chat_id }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card-body border-bottom py-3">
+
+                        <div class="mb-3">
+                            <label class="form-label d-flex align-items-center">
+                                Заголовок
+                                {{ ai_btn("title") }}
+                            </label>
+                            <input type="text" name="title" class="form-control"
+                                   value="{{ channel.title or post.title }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label d-flex align-items-center">
+                                Текст
+                                {{ ai_btn("description") }}
+                            </label>
+                            <textarea name="description" class="form-control" rows="6"
+                                      >{{ channel.description or post.description or '' }}</textarea>
+                        </div>
+
+                        <div class="mb-0">
+                            <label class="form-label">Дата и время публикации</label>
+                            <input type="datetime-local" name="scheduled_at" class="form-control"
+                                   value="{{ channel.scheduled_at.strftime('%Y-%m-%dT%H:%M') if channel.scheduled_at else '' }}">
+                            <small class="form-hint">Оставьте пустым — публикация сразу при статусе «Готов»</small>
+                        </div>
+
+                    </div>
+
+                    <div class="card-footer">
+                        <div class="btn-list ms-auto justify-content-end">
+                            <a href="/admin/posts" class="btn btn-danger">Отмена</a>
+                            <button type="submit" class="btn btn-success">Сохранить</button>
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+{{ ai_overlay() }}
+{% endblock %}
