@@ -24,7 +24,8 @@ from app.views.ai_provider import AIProviderWizardView
 from app.views.telegram_source import TelegramSourceWizardView
 from app.views.vk_source import VKSourceWizardView
 from app.views.max_source import MAXSourceWizardView
-from app.fields import TokenField
+from app.fields import TokenField, PasswordField, TranslatedEnumField
+from app.auth import hash_password
 
 
 # ── AI провайдеры: вспомогательные функции ──────────────────────────────────
@@ -246,10 +247,10 @@ class AdminUserView(SuperadminOnly, ModelView):
     fields = [
         IntegerField("id", label="ID", read_only=True, exclude_from_create=True),
         StringField("username", label="Логин"),
-        StringField("password_hash", label="Пароль", exclude_from_list=True,
-                    help_text="Смените пароль через create_superadmin.py"),
-        EnumField("role", label="Роль", enum=Role,
-                  choices=[("superadmin", "Суперадмин"), ("editor", "Редактор")]),
+        PasswordField("password_hash", label="Пароль", exclude_from_list=True,
+                      help_text="Оставьте пустым, чтобы не менять пароль"),
+        TranslatedEnumField("role", label="Роль", enum=Role,
+                            choices=[("superadmin", "Суперадмин"), ("editor", "Редактор")]),
         BooleanField("is_active", label="Активен"),
         DateTimeField("created_at", label="Создан", read_only=True,
                       exclude_from_create=True, output_format="%d.%m.%Y %H:%M"),
@@ -259,13 +260,20 @@ class AdminUserView(SuperadminOnly, ModelView):
     sortable_fields = ["id", "username", "role", "is_active"]
     searchable_fields = ["username"]
 
+    async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
+        password = (data.get("password_hash") or "").strip()
+        if password:
+            data["password_hash"] = hash_password(password)
+        elif not is_created:
+            data["password_hash"] = model.password_hash
+
 
 # ── Фабрика Admin ────────────────────────────────────────────────────────────
 
 def create_admin() -> Admin:
     admin = Admin(
         engine,
-        title="Autoposter",
+        title="Postery",
         base_url="/admin",
         route_name="admin",
         templates_dir=TEMPLATES_DIR,
