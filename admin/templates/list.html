@@ -1,0 +1,346 @@
+{% extends "layout.html" %}
+{% block header %}
+    <div class="d-flex justify-content-between align-items-center">
+        <h1>{{ model.label }}</h1>
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{{ url_for(__name__ ~ ':index') }}">Админ</a>
+            </li>
+            <li class="breadcrumb-item active">{{ model.label }}</li>
+        </ol>
+    </div>
+{% endblock %}
+{% block modal %}
+    {% include "modals/loading.html" %}
+    {% include "modals/error.html" %}
+    {% include "modals/actions.html" %}
+{% endblock %}
+{% block content %}
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center gap-3">
+                        <div id="btn_container"></div>
+
+                        {# Поиск — слева #}
+                        <div class="input-icon" style="width:260px;">
+                            <span class="input-icon-addon">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24"
+                                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                     fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <circle cx="10" cy="10" r="7"/>
+                                    <line x1="21" y1="21" x2="15" y2="15"/>
+                                </svg>
+                            </span>
+                            <input type="search" id="searchInput" value=""
+                                   class="form-control"
+                                   placeholder="Поиск..."
+                                   aria-label="Search in list"/>
+                        </div>
+
+                        {# Кнопка — вправо #}
+                        <div class="ms-auto d-flex align-items-center gap-2">
+                            {% include "actions.html" %}
+                            {% if model.identity == 'ai-provider' %}
+                                <div class="dropdown">
+                                    <button type="button" class="btn btn-primary dropdown-toggle"
+                                            data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fa-solid fa-plus me-2"></i>Добавить
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <a class="dropdown-item" href="/admin/ai-provider/wizard?type=openai">
+                                                <i class="fa-solid fa-brain me-2"></i>OpenAI
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="/admin/ai-provider/wizard?type=gigachat">
+                                                <i class="fa-solid fa-comment-dots me-2"></i>GigaChat
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            {% elif model.identity == 'telegram-source' %}
+                                <a href="/admin/telegram-source/wizard" class="btn btn-primary">
+                                    <i class="fa-solid fa-plus me-2"></i>Добавить
+                                </a>
+                            {% elif model.identity == 'v-k-source' %}
+                                <a href="/admin/vk-source/wizard" class="btn btn-primary">
+                                    <i class="fa-solid fa-plus me-2"></i>Добавить
+                                </a>
+                            {% elif model.identity == 'm-a-x-source' %}
+                                <a href="/admin/max-source/wizard" class="btn btn-primary">
+                                    <i class="fa-solid fa-plus me-2"></i>Добавить
+                                </a>
+                            {% elif model.can_create(request) %}
+                                <a href="{{ model.wizard_create_url if model.wizard_create_url is defined else url_for(__name__ ~ ':create', identity=model.identity) }}"
+                                   class="btn btn-primary">
+                                    <i class="fa-solid fa-plus me-2"></i>
+                                    Добавить
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body border-bottom p-0">
+                        <div id="pageLength_container" style="display:none;"></div>
+                        <div id="alertContainer"></div>
+                    </div>
+                    <table id="dt" class="table table-vcenter text-nowrap">
+                        <thead>
+                        <tr id="table-header">
+                            <th></th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block head_css %}
+    {{ super() }}
+    <link rel="stylesheet"
+          href="{{ url_for(__name__ ~ ':statics', path='css/dt.min.css') }}"/>
+    <link rel="stylesheet"
+          href="{{ url_for(__name__ ~ ':statics', path='css/dt.checkboxes.css') }}"/>
+    {% for link in model._additional_css_links(request, "LIST" | ra) %}
+        <link rel="stylesheet" href="{{ link }}">
+    {% endfor %}
+    <style>
+        div.dataTables_wrapper div.dataTables_info { padding-top: 0; }
+        table.dataTable span.highlight { background-color: #ffff88; border-radius: .28rem; }
+        table.dataTable span.column_highlight { background-color: #ffcc99; border-radius: .28rem; }
+        table.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control:before,
+        table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control:before { background-color: #6366f1; }
+        table.dataTable { margin-top: 0 !important; margin-bottom: 0 !important; }
+
+        /* скрываем pageLength */
+        #pageLength_container { display: none !important; }
+
+        /* скрываем стандартную пагинацию DataTables */
+        .dataTables_paginate { display: none !important; }
+
+        /* счётчик записей */
+        .dataTables_info { font-size: .8rem; color: #94a3b8; }
+
+        /* ── Кастомная пагинация ────────────────────────────────────────── */
+        #custom-pag { display: flex; align-items: center; gap: .3rem; }
+
+        .pag-btn {
+            min-width: 32px;
+            height: 32px;
+            padding: 0 .55rem;
+            border-radius: 7px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #475569;
+            font-size: .82rem;
+            font-weight: 500;
+            cursor: pointer;
+            line-height: 1;
+            transition: background .12s, border-color .12s, color .12s;
+            white-space: nowrap;
+        }
+        .pag-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #1e293b; }
+        .pag-btn.pag-btn--active {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: #fff;
+            cursor: default;
+            pointer-events: none;
+        }
+        .pag-sep { color: #cbd5e1; font-size: .85rem; padding: 0 .1rem; user-select: none; }
+
+        /* красная корзина */
+        .row-action-btn--row_action_3_delete { color: #ef4444 !important; }
+
+        /* курсор-указатель на строках */
+        #dt tbody tr { cursor: pointer; }
+
+        /* статус-бейджи */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .2rem .6rem;
+            border-radius: 20px;
+            font-size: .775rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+    </style>
+{% endblock %}
+{% block script %}
+    {{ super() }}
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/vendor/moment.min.js') }}"></script>
+    {% if get_locale() != 'en' %}
+        <script type="text/javascript"
+                src="{{ url_for(__name__ ~ ':statics', path='i18n/momentjs/' ~ get_locale() ~ '.js') }}"></script>
+    {% endif %}
+    {% if 'pdf' in model.export_types %}
+        <script type="text/javascript"
+                src="{{ url_for(__name__ ~ ':statics', path='js/vendor/pdfmake.min.js') }}"></script>
+        <script type="text/javascript"
+                src="{{ url_for(__name__ ~ ':statics', path='js/vendor/vfs_fonts.js') }}"></script>
+    {% endif %}
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/vendor/dt.min.js') }}"></script>
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/vendor/dt.checkboxes.js') }}"></script>
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/vendor/dt.searchHighlight.js') }}"></script>
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/vendor/qs.min.js') }}"></script>
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/utils.js').include_query_params(v=1) }}"></script>
+    <script>var model = {{__js_model__ | tojson | safe}};</script>
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/render.js').include_query_params(v=1) }}"></script>
+    {% if custom_render_js(request) %}
+        <script type="text/javascript" src="{{ custom_render_js(request) }}"></script>
+    {% endif %}
+    {% for link in model._additional_js_links(request, "LIST" | ra) %}
+        <script type="text/javascript" src="{{ link }}"></script>
+    {% endfor %}
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/alerts.js').include_query_params(v=1) }}"></script>
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/actions.js').include_query_params(v=1) }}"></script>
+    <script type="text/javascript"
+            src="{{ url_for(__name__ ~ ':statics', path='js/list.js').include_query_params(v=2) }}"></script>
+    <script>
+    (function () {
+        const STATUS = {
+            // PostStatus
+            'draft':      { icon: 'fa-solid fa-pen-line',        color: '#94a3b8', bg: 'rgba(148,163,184,.13)', label: 'Черновик'    },
+            'ready':      { icon: 'fa-solid fa-circle-check',    color: '#6366f1', bg: 'rgba(99,102,241,.13)',  label: 'Готов'       },
+            'published':  { icon: 'fa-solid fa-paper-plane',     color: '#22c55e', bg: 'rgba(34,197,94,.13)',   label: 'Опубликован' },
+            // ChannelStatus
+            'pending':    { icon: 'fa-solid fa-clock',           color: '#f59e0b', bg: 'rgba(245,158,11,.13)',  label: 'Ожидает'     },
+            'failed':     { icon: 'fa-solid fa-circle-xmark',    color: '#ef4444', bg: 'rgba(239,68,68,.13)',   label: 'Ошибка'      },
+            // Role
+            'superadmin': { icon: 'fa-solid fa-shield-halved',   color: '#6366f1', bg: 'rgba(99,102,241,.13)',  label: 'Суперадмин'  },
+            'editor':     { icon: 'fa-solid fa-pencil',          color: '#0ea5e9', bg: 'rgba(14,165,233,.13)',  label: 'Редактор'    },
+        };
+
+        function transformStatuses() {
+            document.querySelectorAll('#dt td').forEach(td => {
+                const raw = td.textContent.trim().toLowerCase();
+                const s = STATUS[raw];
+                if (!s || td.dataset.statusDone) return;
+                td.dataset.statusDone = '1';
+                td.innerHTML =
+                    `<span class="status-badge" style="color:${s.color};background:${s.bg};">` +
+                    `<i class="${s.icon}" style="font-size:.7rem;"></i>${s.label}</span>`;
+            });
+        }
+
+        function renderPagination(api) {
+            const info  = api.page.info();
+            const cur   = info.page;       // 0-based
+            const total = info.pages;
+            const el    = document.getElementById('custom-pag');
+            if (!el) return;
+
+            if (total <= 1) { el.innerHTML = ''; return; }
+
+            // Окно из 3 страниц вокруг текущей
+            let wStart = Math.max(0, cur - 1);
+            let wEnd   = Math.min(total - 1, wStart + 2);
+            wStart     = Math.max(0, wEnd - 2);   // сдвигаем если упёрлись в конец
+
+            const parts = [];
+
+            // Кнопка «Первая» — только если не на 1-й странице И стр. 1 не попала в окно
+            if (cur > 0 && wStart > 0) {
+                parts.push(`<button class="pag-btn" data-p="0">1</button>`);
+                if (wStart > 1) parts.push(`<span class="pag-sep">···</span>`);
+            }
+
+            // Три страницы окна
+            for (let p = wStart; p <= wEnd; p++) {
+                parts.push(
+                    `<button class="pag-btn${p === cur ? ' pag-btn--active' : ''}" data-p="${p}">${p + 1}</button>`
+                );
+            }
+
+            // Кнопка «Последняя» — если последняя страница не попала в окно
+            if (wEnd < total - 1) {
+                if (wEnd < total - 2) parts.push(`<span class="pag-sep">···</span>`);
+                parts.push(`<button class="pag-btn" data-p="${total - 1}">${total}</button>`);
+            }
+
+            el.innerHTML = parts.join('');
+            el.querySelectorAll('.pag-btn:not(.pag-btn--active)').forEach(btn => {
+                btn.addEventListener('click', () => api.page(+btn.dataset.p).draw('page'));
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const table = document.getElementById('dt');
+            if (!table) return;
+            const $t = $(table);
+
+            // Вставляем контейнер пагинации в футер рядом со счётчиком
+            $t.on('init.dt', function () {
+                const footer = document.querySelector('.dataTables_wrapper .card-footer');
+                if (footer && !document.getElementById('custom-pag')) {
+                    const pag = document.createElement('div');
+                    pag.id = 'custom-pag';
+                    pag.className = 'ms-auto';
+                    footer.appendChild(pag);
+                }
+                renderPagination($t.DataTable());
+            });
+
+            $t.on('draw.dt', function () {
+                document.querySelectorAll('#dt td[data-status-done]')
+                    .forEach(td => delete td.dataset.statusDone);
+                transformStatuses();
+                renderPagination($t.DataTable());
+            });
+        });
+    })();
+    </script>
+    <script>
+    (function () {
+        const SOURCE_IDENTITIES = ['telegram-source', 'vk-source', 'max-source'];
+
+        // Скрыть карандаш у источников (редактирование доступно через клик по строке)
+        if (SOURCE_IDENTITIES.includes(model.identity)) {
+            document.head.insertAdjacentHTML('beforeend',
+                '<style>.row-action-btn--row_action_2_edit{display:none!important}</style>');
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const table = document.getElementById('dt');
+            if (!table) return;
+            const $t = $(table);
+
+            // Перенести заголовок колонки действий в конец (выполняется один раз)
+            $t.one('init.dt', function () {
+                const $hdr = $('#table-header');
+                $hdr.append($hdr.find('th').eq(1).detach());
+            });
+
+            // Перенести ячейку действий в конец каждой строки после отрисовки
+            $t.on('draw.dt', function () {
+                $('#dt tbody tr').each(function () {
+                    $(this).find('td:has(.row-actions-container)').appendTo(this);
+                });
+            });
+
+            // Открытие записи по клику на строку (переход к редактированию)
+            $t.on('click', 'tbody tr', function (e) {
+                if ($(e.target).closest('.form-check-input, .row-actions-container, a, button').length) return;
+                const href = $(this).find('.row-action-btn--row_action_2_edit').attr('href');
+                if (href && href !== '#') window.location.href = href;
+            });
+        });
+    })();
+    </script>
+{% endblock %}

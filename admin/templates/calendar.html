@@ -1,0 +1,270 @@
+{% extends "layout.html" %}
+
+{% block header %}
+<div class="d-flex justify-content-between align-items-center">
+    <h1>Календарь публикаций</h1>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for(__name__ ~ ':index') }}">Админ</a></li>
+        <li class="breadcrumb-item active">Календарь</li>
+    </ol>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+
+                {# ── Шапка: навигация по месяцу ─────────────────────────────── #}
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <a href="?year={{ prev_year }}&month={{ prev_month }}"
+                       class="btn btn-sm btn-ghost-secondary">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </a>
+                    <h3 class="mb-0 fw-semibold" style="font-size:1.1rem;">
+                        {{ month_name }} {{ year }}
+                    </h3>
+                    <a href="?year={{ next_year }}&month={{ next_month }}"
+                       class="btn btn-sm btn-ghost-secondary">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+
+                {# ── Сетка календаря ────────────────────────────────────────── #}
+                <div class="card-body p-0">
+                    <table class="cal-table w-100">
+                        <thead>
+                            <tr>
+                                {% for wd in weekdays %}
+                                <th class="cal-th">{{ wd }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for week in weeks %}
+                            <tr>
+                            {% for day in week %}
+                                {% if day is none %}
+                                    <td class="cal-cell cal-cell--empty"></td>
+                                {% else %}
+                                    <td class="cal-cell {% if day.is_today %}cal-cell--today{% endif %} {% if day.has_data %}cal-cell--has-data{% endif %}"
+                                        data-date="{{ day.date_str }}"
+                                        data-label="{{ day.date.day }} {{ months_gen[month] }} {{ year }}">
+                                        <div class="cal-day-num">{{ day.date.day }}</div>
+                                        {% if day.sources %}
+                                        <div class="cal-icons">
+                                            {% for src in day.sources %}
+                                            <span class="cal-src-icon" style="color:{{ src.color }};" title="{{ src.type }}">
+                                                <i class="{{ src.icon }}"></i>
+                                            </span>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            {% endfor %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Модальное окно дня ───────────────────────────────────────────────────── #}
+<div class="modal modal-blur fade" id="dayModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:520px;" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dayModalTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0" id="dayModalBody">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+/* ── Таблица-шахматка ──────────────────────────────────────── */
+.cal-table { border-collapse: collapse; table-layout: fixed; }
+
+.cal-th {
+    text-align: center;
+    padding: .5rem 0;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #94a3b8;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.cal-cell {
+    border: 1px solid #f1f5f9;
+    vertical-align: top;
+    height: 90px;
+    padding: .4rem .5rem;
+    cursor: pointer;
+    transition: background .12s;
+    position: relative;
+}
+.cal-cell:hover { background: #f8fafc; }
+.cal-cell--empty { background: #fafafa; cursor: default; }
+.cal-cell--today .cal-day-num {
+    background: #6366f1;
+    color: #fff;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cal-cell--has-data { background: #fefeff; }
+.cal-cell--has-data:hover { background: #f0f0ff; }
+
+.cal-day-num {
+    font-size: .82rem;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: .3rem;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cal-icons { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .2rem; }
+.cal-src-icon { font-size: 1.05rem; line-height: 1; }
+
+/* ── Модальное окно: таймлайн ──────────────────────────────── */
+.timeline { display: flex; flex-direction: column; }
+
+.tl-hour {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: .6rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+.tl-hour:last-child { border-bottom: none; }
+
+.tl-time {
+    min-width: 42px;
+    font-size: .8rem;
+    font-weight: 600;
+    color: #94a3b8;
+    padding-top: .15rem;
+    flex-shrink: 0;
+}
+
+.tl-posts { display: flex; flex-direction: column; gap: .4rem; flex: 1; }
+
+.tl-post {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: .4rem .65rem;
+    font-size: .84rem;
+}
+.tl-post-icon { font-size: .95rem; flex-shrink: 0; }
+.tl-post-title { flex: 1; font-weight: 500; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-post-src { font-size: .75rem; color: #64748b; }
+
+.tl-status {
+    font-size: .72rem;
+    font-weight: 500;
+    padding: .15rem .45rem;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+.tl-status--pending   { color: #f59e0b; background: rgba(245,158,11,.13); }
+.tl-status--published { color: #22c55e; background: rgba(34,197,94,.13); }
+.tl-status--failed    { color: #ef4444; background: rgba(239,68,68,.13); }
+
+.modal-empty {
+    text-align: center;
+    color: #94a3b8;
+    padding: 2rem;
+    font-size: .9rem;
+}
+</style>
+{% endblock %}
+
+{% block script %}
+{{ super() }}
+<script>
+(function () {
+    const DATA = {{ js_data | safe }};
+
+    const STATUS_LABELS = {
+        pending:   'Ожидает',
+        published: 'Опубликован',
+        failed:    'Ошибка',
+    };
+
+    document.querySelectorAll('.cal-cell:not(.cal-cell--empty)').forEach(cell => {
+        cell.addEventListener('click', () => {
+            const ds    = cell.dataset.date;
+            const label = cell.dataset.label;
+            openModal(ds, label);
+        });
+    });
+
+    function openModal(ds, label) {
+        document.getElementById('dayModalTitle').textContent = label;
+        const body = document.getElementById('dayModalBody');
+        const day  = DATA[ds];
+
+        if (!day || !Object.keys(day.hours).length) {
+            body.innerHTML = '<div class="modal-empty"><i class="fa-regular fa-calendar-xmark fa-lg mb-2 d-block"></i>Нет запланированных публикаций</div>';
+        } else {
+            let html = '<div class="timeline">';
+            for (const [hour, posts] of Object.entries(day.hours)) {
+                const hh = String(hour).padStart(2, '0') + ':00';
+                html += `<div class="tl-hour">`;
+                html += `<div class="tl-time">${hh}</div>`;
+                html += `<div class="tl-posts">`;
+                for (const p of posts) {
+                    const statusCls = `tl-status--${p.status}`;
+                    const statusLbl = STATUS_LABELS[p.status] || p.status;
+                    html += `
+                        <div class="tl-post">
+                            <span class="tl-post-icon" style="color:${p.source_color};">
+                                <i class="${p.source_icon}"></i>
+                            </span>
+                            <span class="tl-post-title" title="${escHtml(p.post_title)}">${escHtml(p.post_title)}</span>
+                            <span class="tl-post-src">${escHtml(p.source_name)}</span>
+                            <span class="tl-status ${statusCls}">${statusLbl}</span>
+                        </div>`;
+                }
+                html += `</div></div>`;
+            }
+            html += '</div>';
+            body.innerHTML = html;
+        }
+
+        new bootstrap.Modal(document.getElementById('dayModal')).show();
+    }
+
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+})();
+</script>
+{% endblock %}
