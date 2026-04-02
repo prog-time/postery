@@ -12,14 +12,19 @@ RESET="\033[0m"
 
 echo ""
 echo -e "${CYAN}╔══════════════════════════════════════════╗${RESET}"
-echo -e "${CYAN}║     posting.iliya-code.ru  —  Admin      ║${RESET}"
+echo -e "${CYAN}║              Postery  —  Admin           ║${RESET}"
 echo -e "${CYAN}╚══════════════════════════════════════════╝${RESET}"
 echo ""
 
 # ── Virtual environment ──────────────────────────────────────────────────────
-if [ ! -d ".venv" ]; then
+if [ ! -f ".venv/bin/activate" ]; then
     echo -e "${YELLOW}[1/3] Creating virtual environment...${RESET}"
-    python3 -m venv .venv
+    rm -rf .venv
+    if ! python3 -m venv .venv 2>/dev/null; then
+        echo -e "${YELLOW}      python3-venv не найден. Устанавливаю...${RESET}"
+        sudo apt install -y python3-venv python3-pip
+        python3 -m venv .venv
+    fi
 else
     echo -e "${GREEN}[1/3] Virtual environment found.${RESET}"
 fi
@@ -31,8 +36,28 @@ echo -e "${YELLOW}[2/3] Installing dependencies...${RESET}"
 pip install -q -r requirements.txt
 echo -e "${GREEN}      Done.${RESET}"
 
+# ── Env file ─────────────────────────────────────────────────────────────────
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+    cp .env.example .env
+    echo -e "${YELLOW}      .env created from .env.example — проверьте настройки.${RESET}"
+fi
+
 # ── Data directory ───────────────────────────────────────────────────────────
 mkdir -p data
+
+# ── Default admin ─────────────────────────────────────────────────────────────
+python3 - <<'EOF'
+from app.database import engine, Base, SessionLocal
+from app.models.admin_user import AdminUser, Role
+from app.auth import hash_password
+Base.metadata.create_all(bind=engine)
+with SessionLocal() as db:
+    if not db.query(AdminUser).first():
+        db.add(AdminUser(username="admin", password_hash=hash_password("admin"), role=Role.SUPERADMIN, is_active=True))
+        db.commit()
+        print("\033[1;33m      Создан пользователь по умолчанию: admin / admin\033[0m")
+        print("\033[1;33m      Смените пароль: python create_superadmin.py\033[0m")
+EOF
 
 # ── Info ─────────────────────────────────────────────────────────────────────
 echo ""
