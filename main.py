@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
         pass
 
 
-app = FastAPI(title="posting.iliya-code.ru", lifespan=lifespan)
+app = FastAPI(title="Postery", lifespan=lifespan)
 
 app.include_router(router)
 
