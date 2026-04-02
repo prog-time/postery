@@ -1,0 +1,255 @@
+from datetime import datetime
+from pathlib import Path
+
+from starlette.requests import Request
+from starlette.responses import Response, RedirectResponse
+from starlette.templating import Jinja2Templates
+from starlette_admin.views import CustomView
+
+from app.config import BASE_DIR
+from app.database import SessionLocal
+from app.models.post import Post, PostImage, PostChannel, PostStatus, ChannelStatus
+from app.models.sources.telegram import TelegramSource
+from app.models.sources.vk import VKSource
+from app.models.sources.max_messenger import MAXSource
+from app.auth import EditorAccessMixin
+
+
+UPLOAD_DIR = Path(BASE_DIR) / "data" / "uploads"
+
+
+# ── Wizard (CustomView) ───────────────────────────────────────────────────────
+
+class PostWizardView(EditorAccessMixin, CustomView):
+    def __init__(self, **kwargs):
+        super().__init__(
+            path="/posts/wizard",
+            template_path="posts/step1.html",
+            methods=["GET", "POST"],
+            **kwargs,
+        )
+
+    async def render(self, request: Request, templates: Jinja2Templates) -> Response:
+        step = int(request.query_params.get("step", 1))
+        post_id = request.query_params.get("post_id")
+        channel_id = request.query_params.get("channel_id")
+
+        with SessionLocal() as db:
+            if request.method == "POST":
+                return await self._post(request, templates, db, step, post_id, channel_id)
+            return await self._get(request, templates, db, step, post_id, channel_id)
+
+    # ── GET ───────────────────────────────────────────────────────────────────
+
+    async def _get(self, request, templates, db, step, post_id, channel_id):
+        wizard_url = str(request.url).split("?")[0]
+
+        if step == 1:
+            post = db.get(Post, int(post_id)) if post_id else None
+            return templates.TemplateResponse(
+                request=request,
+                name="posts/step1.html",
+                context={"step": 1, "post": post, "wizard_url": wizard_url},
+            )
+
+        if step == 2:
+            post = db.get(Post, int(post_id))
+            tg_sources  = db.query(TelegramSource).filter_by(is_active=True).all()
+            vk_sources  = db.query(VKSource).filter_by(is_active=True).all()
+            max_sources = db.query(MAXSource).filter_by(is_active=True).all()
+            selected_tg  = {ch.source_id for ch in post.channels if ch.source_type == "telegram"}
+            selected_vk  = {ch.source_id for ch in post.channels if ch.source_type == "vk"}
+            selected_max = {ch.source_id for ch in post.channels if ch.source_type == "max"}
+            return templates.TemplateResponse(
+                request=request,
+                name="posts/step2.html",
+                context={
+                    "step": 2, "post": post,
+                    "tg_sources": tg_sources, "vk_sources": vk_sources, "max_sources": max_sources,
+                    "selected_tg": selected_tg, "selected_vk": selected_vk, "selected_max": selected_max,
+                    "wizard_url": wizard_url,
+                },
+            )
+
+        if step == 3:
+            from_list = request.query_params.get("from_list") == "1"
+            post = db.get(Post, int(post_id))
+            channel = db.get(PostChannel, int(channel_id))
+            source = _resolve_source(db, channel)
+            if from_list:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="posts/edit_channel.html",
+                    context={
+                        "post": post,
+                        "channel": channel,
+                        "source": source,
+                        "wizard_url": wizard_url,
+                    },
+                )
+            next_channel = _next_channel(post, channel)
+            return templates.TemplateResponse(
+                request=request,
+                name="posts/step3.html",
+                context={
+                    "step": 3,
+                    "post": post,
+                    "channel": channel,
+                    "source": source,
+                    "next_channel": next_channel,
+                    "total": len(post.channels),
+                    "current_num": post.channels.index(channel) + 1,
+                    "wizard_url": wizard_url,
+                },
+            )
+
+    # ── POST ──────────────────────────────────────────────────────────────────
+
+    async def _post(self, request, templates, db, step, post_id, channel_id):
+        form = await request.form()
+        wizard_url = str(request.url).split("?")[0]
+
+        # ── Шаг 1: создать/обновить пост ────────────────────────────────────
+        if step == 1:
+            title = (form.get("title") or "").strip()
+            if not title:
+                post = db.get(Post, int(post_id)) if post_id else None
+                return templates.TemplateResponse(
+                    request=request,
+                    name="posts/step1.html",
+                    context={"step": 1, "post": post, "error": "Заголовок обязателен", "form": dict(form), "wizard_url": wizard_url},
+                )
+
+            if post_id:
+                post = db.get(Post, int(post_id))
+                post.title = title
+                post.description = (form.get("description") or "").strip() or None
+                post.tags = (form.get("tags") or "").strip() or None
+            else:
+                post = Post(
+                    title=title,
+                    description=(form.get("description") or "").strip() or None,
+                    tags=(form.get("tags") or "").strip() or None,
+                )
+                db.add(post)
+                db.flush()
+
+            # Загрузка изображений
+            images = form.getlist("images")
+            for img in images:
+                if hasattr(img, "filename") and img.filename:
+                    upload_dir = UPLOAD_DIR / str(post.id)
+                    upload_dir.mkdir(parents=True, exist_ok=True)
+                    dest = upload_dir / img.filename
+                    content = await img.read()
+                    dest.write_bytes(content)
+                    order = len(post.images)
+                    db.add(PostImage(
+                        post_id=post.id,
+                        file_path=str(dest.relative_to(BASE_DIR)),
+                        order=order,
+                    ))
+
+            db.commit()
+            return RedirectResponse(f"{wizard_url}?post_id={post.id}&step=2", status_code=302)
+
+        # ── Шаг 2: выбрать источники ─────────────────────────────────────────
+        if step == 2:
+            post = db.get(Post, int(post_id))
+            tg_ids  = [int(x) for x in form.getlist("telegram_sources")]
+            vk_ids  = [int(x) for x in form.getlist("vk_sources")]
+            max_ids = [int(x) for x in form.getlist("max_sources")]
+
+            # Удалить старые каналы, пересоздать
+            for ch in list(post.channels):
+                db.delete(ch)
+            db.flush()
+
+            for src_id in tg_ids:
+                db.add(PostChannel(post_id=post.id, source_type="telegram", source_id=src_id))
+            for src_id in vk_ids:
+                db.add(PostChannel(post_id=post.id, source_type="vk", source_id=src_id))
+            for src_id in max_ids:
+                db.add(PostChannel(post_id=post.id, source_type="max", source_id=src_id))
+
+            db.commit()
+            db.refresh(post)
+
+            if not post.channels:
+                tg_sources  = db.query(TelegramSource).filter_by(is_active=True).all()
+                vk_sources  = db.query(VKSource).filter_by(is_active=True).all()
+                max_sources = db.query(MAXSource).filter_by(is_active=True).all()
+                return templates.TemplateResponse(
+                    request=request,
+                    name="posts/step2.html",
+                    context={
+                        "step": 2, "post": post,
+                        "tg_sources": tg_sources, "vk_sources": vk_sources, "max_sources": max_sources,
+                        "selected_tg": set(), "selected_vk": set(), "selected_max": set(),
+                        "error": "Выберите хотя бы один источник",
+                        "wizard_url": wizard_url,
+                    },
+                )
+
+            first = post.channels[0]
+            return RedirectResponse(
+                f"{wizard_url}?post_id={post.id}&step=3&channel_id={first.id}",
+                status_code=302,
+            )
+
+        # ── Шаг 3: кастомизировать канал ─────────────────────────────────────
+        if step == 3:
+            channel = db.get(PostChannel, int(channel_id))
+            post = channel.post
+
+            channel.title = (form.get("title") or "").strip() or None
+            channel.description = (form.get("description") or "").strip() or None
+
+            scheduled_raw = (form.get("scheduled_at") or "").strip()
+            if scheduled_raw:
+                try:
+                    channel.scheduled_at = datetime.fromisoformat(scheduled_raw)
+                except ValueError:
+                    channel.scheduled_at = None
+            else:
+                channel.scheduled_at = None
+
+            db.commit()
+
+            # Если редактирование из списка — сразу назад в список
+            if (form.get("from_list") == "1" or
+                    request.query_params.get("from_list") == "1"):
+                return RedirectResponse("/admin/posts", status_code=302)
+
+            nxt = _next_channel(post, channel)
+            if nxt:
+                return RedirectResponse(
+                    f"{wizard_url}?post_id={post.id}&step=3&channel_id={nxt.id}",
+                    status_code=302,
+                )
+
+            # Все каналы настроены
+            post.status = PostStatus.READY
+            db.commit()
+            return RedirectResponse("/admin/posts", status_code=302)
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _resolve_source(db, channel: PostChannel):
+    if channel.source_type == "telegram":
+        return db.get(TelegramSource, channel.source_id)
+    if channel.source_type == "vk":
+        return db.get(VKSource, channel.source_id)
+    if channel.source_type == "max":
+        return db.get(MAXSource, channel.source_id)
+    return None
+
+
+def _next_channel(post: Post, current: PostChannel) -> PostChannel | None:
+    channels = post.channels
+    try:
+        idx = next(i for i, c in enumerate(channels) if c.id == current.id)
+        return channels[idx + 1] if idx + 1 < len(channels) else None
+    except StopIteration:
+        return None
