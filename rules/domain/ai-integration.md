@@ -51,10 +51,13 @@ _Enforced in:_ `app/routers/ai_generate.py @ generate_text()`
 **BR-005** — If the text field is empty, return `{"ok": false, "error": "Поле пустое — нечего обрабатывать"}` before calling the provider.
 _Enforced in:_ `app/routers/ai_generate.py @ generate_text()`
 
-**BR-006** — The `field` parameter determines which prompt column to read: `"title"` → `source.ai_prompt_title`; `"description"` → `source.ai_prompt_description`.
+**BR-006** — The `field` parameter determines which prompt column to read when no custom prompt is supplied: `"title"` → `source.ai_prompt_title`; `"description"` → `source.ai_prompt_description`. Custom `prompt` always takes precedence over the source-level prompt.
 _Enforced in:_ `app/routers/ai_generate.py @ generate_text()`
 
-**BR-007** — If the source does not exist or the prompt is NULL/empty, call the provider without a system message. Do not fail.
+**BR-007** — If the source does not exist or the prompt is NULL/empty (and no custom prompt provided), call the provider without a system message. Do not fail.
+_Enforced in:_ `app/routers/ai_generate.py @ generate_text()`
+
+**BR-013** — If the request body contains a non-empty `prompt` field, use it as the system message and skip source prompt lookup entirely.
 _Enforced in:_ `app/routers/ai_generate.py @ generate_text()`
 
 **BR-008** — GigaChat OAuth tokens are fetched per-request. Never store them in the database or any server-side cache.
@@ -109,9 +112,10 @@ sequenceDiagram
     participant DB as SQLite
     participant AI as OpenAI / GigaChat
 
-    UI->>API: {text, source_type, source_id, field}
+    UI->>API: {text, source_type, source_id, field, prompt?}
     API->>DB: SELECT active AIProvider
-    API->>DB: SELECT source (for prompt)
+    note over API: if prompt provided → use it as system msg
+    API->>DB: SELECT source (for prompt, only if no custom prompt)
     API->>API: close DB session
     API->>AI: POST /v1/chat/completions (system=prompt, user=text)
     AI-->>API: {choices[0].message.content}
@@ -139,12 +143,19 @@ All error conditions return `{"ok": False, "error": "..."}` with HTTP 200. Never
 
 ## 7. Frontend AI Button Pattern
 
-The AI rewrite button in the post wizard step 3 (and source AI prompts edit) calls `POST /api/ai/generate` via `fetch()`. The UI:
-- Shows a fullscreen overlay with an animated progress bar while waiting
-- Inserts the `result` value into the corresponding field on success
-- Shows the `error` value as a user-visible message on failure
+The AI rewrite button appears on post wizard step 3 (`step3.html`), the add-channel page (`add_channel.html`), and the edit-channel page (`edit_channel.html`). Clicking it opens a modal (`aiPromptModal`) where the user can optionally enter a custom prompt before triggering generation.
 
-The frontend implementation is in the Jinja2 templates under `admin/templates/posts/`. Do not change the API response shape without updating these templates.
+Flow:
+1. User clicks AI button → modal opens, textarea cleared
+2. User optionally types a custom system prompt
+3. User clicks "Сгенерировать" → modal hides, `POST /api/ai/generate` is called
+4. If custom prompt was entered: it is sent as `prompt` and takes priority over source's AI prompt
+5. If custom prompt was left empty: backend falls back to source's `ai_prompt_title` / `ai_prompt_description`
+6. On success: result is inserted into the target field; on error: overlay shows the error message
+
+The macro `ai_modals()` renders the modal HTML; `ai_script()` renders the JS. Both must be included together on any page that uses AI buttons. If either element is absent, the IIFE exits silently via null guard.
+
+The frontend implementation lives in `admin/templates/posts/_ai_generate.html`. Do not change the API response shape without updating these templates.
 
 ---
 
@@ -177,6 +188,7 @@ The frontend implementation is in the Jinja2 templates under `admin/templates/po
 - [ ] `after_create` and `after_edit` hooks deactivate other providers on activation
 - [ ] Only one record per `provider_type`
 - [ ] Generation endpoint returns `{"ok": bool, ...}` for all cases (no HTTP exceptions)
+- [ ] Custom `prompt` field in request body takes priority over source-level AI prompt when non-empty
 - [ ] GigaChat SSL verification disabled (`verify=False`), warnings suppressed
 - [ ] GigaChat OAuth token fetched per-request, never stored
 - [ ] DB session closed before any AI API call

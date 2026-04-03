@@ -42,7 +42,8 @@ Router: `app/routers/ai_generate.py` (prefix `/api/ai`)
   "text": "string",          // text to rewrite (required, non-empty after strip)
   "source_type": "string",   // "telegram" | "vk" | "max"
   "source_id": 0,            // integer PK of the source record
-  "field": "string"          // "title" | "description"
+  "field": "string",         // "title" | "description"
+  "prompt": "string|null"    // optional custom system prompt; null → use source's ai_prompt_*
 }
 ```
 

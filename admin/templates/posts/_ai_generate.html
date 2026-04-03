@@ -79,7 +79,7 @@
     const promptTA  = document.getElementById('ai-custom-prompt');
     const submitBtn = document.getElementById('ai-prompt-submit');
 
-    if (!ctx || !overlay) return;
+    if (!ctx || !overlay || !promptTA || !submitBtn) return;
 
     let activeField = null;
     let animTimer   = null;
