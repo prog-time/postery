@@ -153,7 +153,9 @@
             const input = document.querySelector(`[name="${field}"]`);
             if (!input) { resolve(false); return; }
 
-            const text = input.value.trim();
+            const text = (field === 'description' && window.postDescriptionEditor)
+                ? window.postDescriptionEditor.value().trim()
+                : input.value.trim();
             if (!text) {
                 alert('Поле пустое — заполните текст перед генерацией');
                 resolve(false);
@@ -180,7 +182,11 @@
             .then(r => r.json())
             .then(data => {
                 if (data.ok) {
-                    input.value = data.result;
+                    if (field === 'description' && window.postDescriptionEditor) {
+                        window.postDescriptionEditor.value(data.result);
+                    } else {
+                        input.value = data.result;
+                    }
                     finishProgress(true);
                     // Дождаться закрытия оверлея (500 мс анимация) перед resolve
                     setTimeout(() => resolve(true), 600);

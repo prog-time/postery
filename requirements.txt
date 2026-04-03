@@ -11,6 +11,7 @@ httpx
 cryptography
 python-dotenv
 slowapi
+mistune>=3.0
 pytest
 pytest-asyncio
 respx

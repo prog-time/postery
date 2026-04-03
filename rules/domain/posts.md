@@ -19,7 +19,7 @@ A Post holds a title, optional description, comma-separated tags, and attached i
 
 | Concept | Description |
 |---------|-------------|
-| Post | Master content record: title, description, tags, images |
+| Post | Master content record: title, description (raw markdown), tags, images |
 | PostChannel | One publication target for a post (one per source selection) |
 | PostStatus | Lifecycle state of the post: draft → ready → published |
 | ChannelStatus | State of a single channel: pending → published / failed |
@@ -66,6 +66,9 @@ _Enforced in:_ `app/views/posts.py @ PostWizardView._post()` step 1, `app/router
 **BR-014** — A post may have at most `MAX_IMAGES_PER_POST` (10) images. Attempts to upload more are rejected with an error message stating how many are already attached and how many are being added.
 _Enforced in:_ `app/views/posts.py @ PostWizardView._post()` step 1
 
+**BR-015** — `post.description` (and `channel.description`) stores raw markdown text. Conversion to HTML or plain text happens exclusively in `build_text()` at publish time, never at save time. The UI uses EasyMDE as the markdown editor on step 1 and step 3.
+_Enforced in:_ `app/publisher/utils.py @ build_text()`, `admin/templates/posts/step1.html`, `admin/templates/posts/step3.html`
+
 **BR-012** — Tags are stored as a raw comma-separated string. They are converted to `#hashtag` format at publish time via `format_tags()`, not at creation time.
 _Enforced in:_ `app/publisher/utils.py @ format_tags()`
 
@@ -93,7 +96,7 @@ stateDiagram-v2
 
 Route: `GET/POST /admin/posts/wizard?step=1[&post_id=N]`
 
-Form fields: `title` (required), `description` (optional), `tags` (optional), `images[]` (file upload, optional)
+Form fields: `title` (required), `description` (optional, stored as raw markdown), `tags` (optional), `images[]` (file upload, optional)
 
 Rules:
 - Title is required — return step 1 with error if blank
@@ -140,8 +143,8 @@ text = post.title + "\n" + post.description
 ```
 
 `build_text()` output structure:
-1. `<b>title</b>` (HTML) or `title` (plain)
-2. `description` (if present)
+1. `<b>title</b>` (HTML) or `title` (plain) — title is never markdown-converted
+2. `description` converted from raw markdown — HTML for Telegram, plain text for VK/MAX (if present)
 3. `#hashtag_one #hashtag_two` (if tags present)
 
 Parts joined with `\n\n`.

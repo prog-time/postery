@@ -1,6 +1,10 @@
 {% extends "layout.html" %}
 {% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
 
+{% block head_css %}
+<link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+{% endblock %}
+
 {% block header %}
 <div class="row align-items-center mb-2">
     <div class="col">
@@ -114,6 +118,21 @@
 {% endblock %}
 
 {% block script %}
+<script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+<script>
+window.postDescriptionEditor = new EasyMDE({
+    element: document.querySelector('textarea[name="description"]'),
+    spellChecker: false,
+    autosave: { enabled: false },
+    toolbar: ["bold", "italic", "strikethrough", "|",
+              "unordered-list", "ordered-list", "|",
+              "link", "code", "|",
+              "preview", "side-by-side", "fullscreen", "|",
+              "guide"],
+    status: false,
+    minHeight: "200px",
+});
+</script>
 {{ super() }}
 {{ ai_script(auto_generate=auto_generate) }}
 {% endblock %}

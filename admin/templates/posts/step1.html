@@ -10,6 +10,7 @@
 {% endblock %}
 
 {% block head_css %}
+<link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
 <style>
 /* ── Tag input ─────────────────────────────────────────────────────────── */
 .tag-input-wrap {
@@ -174,6 +175,21 @@
 </div>
 
 {% block script %}
+<script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+<script>
+window.postDescriptionEditor = new EasyMDE({
+    element: document.querySelector('textarea[name="description"]'),
+    spellChecker: false,
+    autosave: { enabled: false },
+    toolbar: ["bold", "italic", "strikethrough", "|",
+              "unordered-list", "ordered-list", "|",
+              "link", "code", "|",
+              "preview", "side-by-side", "fullscreen", "|",
+              "guide"],
+    status: false,
+    minHeight: "200px",
+});
+</script>
 <script>
 /* ── Tag input ─────────────────────────────────────────────── */
 const wrap      = document.getElementById('tag-wrap');
@@ -227,6 +243,9 @@ const imgInput = document.getElementById('images-input');
 const preview = document.getElementById('preview-row');
 const imgCountEl = document.getElementById('img-count');
 
+// Список выбранных новых файлов (File[]) — иммутабельный FileList нельзя менять
+let pendingFiles = [];
+
 function currentExistingCount() {
     const wrap = document.getElementById('existing-images');
     return wrap ? wrap.querySelectorAll('[id^="img-wrap-"]').length : 0;
@@ -234,43 +253,66 @@ function currentExistingCount() {
 
 function updateCountDisplay() {
     if (imgCountEl) {
-        const existing = currentExistingCount();
-        const newPreviews = preview.querySelectorAll('.col-auto').length;
-        imgCountEl.textContent = existing + newPreviews;
+        imgCountEl.textContent = currentExistingCount() + pendingFiles.length;
     }
+}
+
+// Синхронизируем pendingFiles обратно в input через DataTransfer
+function syncInputFiles() {
+    const dt = new DataTransfer();
+    pendingFiles.forEach(f => dt.items.add(f));
+    imgInput.files = dt.files;
 }
 
 area.addEventListener('click',    () => imgInput.click());
 area.addEventListener('dragover',  e => { e.preventDefault(); area.style.background = '#f1f5f9'; });
 area.addEventListener('dragleave', () => { area.style.background = ''; });
-area.addEventListener('drop', e => { e.preventDefault(); area.style.background = ''; renderImages(e.dataTransfer.files); });
-imgInput.addEventListener('change', () => renderImages(imgInput.files));
+area.addEventListener('drop', e => { e.preventDefault(); area.style.background = ''; addFiles(e.dataTransfer.files); });
+imgInput.addEventListener('change', () => { addFiles(imgInput.files); });
 
-function renderImages(files) {
-    const existing = currentExistingCount();
-    const alreadyQueued = preview.querySelectorAll('.col-auto').length;
-    let slots = MAX_IMAGES - existing - alreadyQueued;
-    const fileArr = [...files];
+function addFiles(files) {
+    const slots = MAX_IMAGES - currentExistingCount() - pendingFiles.length;
     if (slots <= 0) {
         alert(`Нельзя прикрепить больше ${MAX_IMAGES} изображений.`);
-        imgInput.value = '';
+        syncInputFiles();
         return;
     }
-    const allowed = fileArr.slice(0, slots);
-    if (allowed.length < fileArr.length) {
+    const toAdd = [...files].slice(0, slots);
+    if (toAdd.length < files.length) {
         alert(`Можно добавить ещё ${slots} изображений. Лишние файлы проигнорированы.`);
     }
-    allowed.forEach(f => {
+    toAdd.forEach(f => {
+        const idx = pendingFiles.length;
+        pendingFiles.push(f);
         const r = new FileReader();
-        r.onload = e => {
-            const d = document.createElement('div');
-            d.className = 'col-auto';
-            d.innerHTML = `<img src="${e.target.result}" class="rounded" style="height:72px;width:72px;object-fit:cover;">`;
-            preview.appendChild(d);
-            updateCountDisplay();
-        };
+        r.onload = ev => addPreviewCard(ev.target.result, idx);
         r.readAsDataURL(f);
     });
+    syncInputFiles();
+}
+
+function addPreviewCard(src, idx) {
+    const d = document.createElement('div');
+    d.className = 'col-auto position-relative';
+    d.dataset.idx = idx;
+    d.innerHTML =
+        `<img src="${src}" class="rounded" style="height:72px;width:72px;object-fit:cover;">` +
+        `<button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 p-0" ` +
+        `style="width:20px;height:20px;line-height:1;font-size:.65rem;border-radius:50%;" ` +
+        `onclick="removePending(this)" title="Удалить">×</button>`;
+    preview.appendChild(d);
+    updateCountDisplay();
+}
+
+function removePending(btn) {
+    const card = btn.closest('.col-auto');
+    const idx  = parseInt(card.dataset.idx);
+    pendingFiles.splice(idx, 1);
+    // перенумеровываем оставшиеся карточки
+    card.remove();
+    preview.querySelectorAll('.col-auto[data-idx]').forEach((c, i) => { c.dataset.idx = i; });
+    syncInputFiles();
+    updateCountDisplay();
 }
 
 /* ── Delete existing image ─────────────────────────────────── */

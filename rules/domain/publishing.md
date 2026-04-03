@@ -65,6 +65,9 @@ _Enforced in:_ `app/publisher/telegram.py`, `app/publisher/vk.py`, `app/publishe
 **BR-012** — Telegram uses `parse_mode=HTML`. Use `<b>title</b>` for bold. VK and MAX use plain text (no HTML tags).
 _Enforced in:_ `app/publisher/utils.py @ build_text()` (`bold_title` parameter)
 
+**BR-013** — `build_text()` converts `description` from raw markdown before appending it to the result. `bold_title=True` (Telegram) → markdown→HTML via `mistune`; `bold_title=False` (VK/MAX) → markdown→plain text (all HTML tags stripped). The title is never markdown-converted.
+_Enforced in:_ `app/publisher/utils.py @ build_text()` / `_md_to_html()` / `_md_to_plain()`
+
 ---
 
 ## 4. Worker Lifecycle
@@ -146,8 +149,8 @@ text_plain = build_text(channel, post, bold_title=False)
 ```
 
 `build_text()` output:
-1. `<b>effective_title</b>` or `effective_title` (plain)
-2. `effective_description` (if present)
+1. `<b>effective_title</b>` or `effective_title` (plain) — title is never markdown-converted
+2. `effective_description` converted from raw markdown: HTML for Telegram, plain text for VK/MAX (if present)
 3. `#hashtag_one #hashtag_two` (if `post.tags` present)
 
 Parts joined with `\n\n`.
