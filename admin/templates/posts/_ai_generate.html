@@ -81,9 +81,6 @@
 
     if (!ctx || !overlay) return;
 
-    const sourceType = ctx.dataset.sourceType;
-    const sourceId   = parseInt(ctx.dataset.sourceId, 10);
-
     let activeField = null;
     let animTimer   = null;
     let currentPct  = 0;
@@ -144,6 +141,15 @@
     // On error the overlay stays open showing the error — the user can dismiss it.
     function runGenerate(field, customPrompt) {
         return new Promise((resolve) => {
+            const sourceType = ctx.dataset.sourceType;
+            const sourceId   = parseInt(ctx.dataset.sourceId, 10);
+
+            if (!sourceType || !sourceId) {
+                alert('Выберите источник публикации перед генерацией');
+                resolve(false);
+                return;
+            }
+
             const input = document.querySelector(`[name="${field}"]`);
             if (!input) { resolve(false); return; }
 
