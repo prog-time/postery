@@ -1,57 +1,237 @@
 {% extends "layout.html" %}
 
 {% block header %}
-<div class="row align-items-center">
-    <div class="col">
-        <h2 class="page-title">Dashboard</h2>
+<div class="d-flex justify-content-between align-items-center">
+    <div>
+        <h2 class="page-title">Аналитика</h2>
         <div class="text-muted mt-1">Добро пожаловать в панель управления Postery</div>
     </div>
+    {% if active_provider %}
+    <span class="badge bg-green-lt fs-6">
+        <i class="fa-solid fa-microchip me-1"></i>
+        AI: {{ active_provider }}
+    </span>
+    {% else %}
+    <span class="badge bg-secondary-lt fs-6">
+        <i class="fa-solid fa-microchip me-1"></i>
+        AI не подключён
+    </span>
+    {% endif %}
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="col-12">
-    <div class="row row-cards">
+<div class="container-fluid">
 
-        {# Карточки-ссылки на разделы #}
-        <div class="col-sm-6 col-lg-4">
-            <a href="{{ request.url_for(__name__ ~ ':list', identity='telegram-source') }}"
-               class="card card-link card-link-pop text-decoration-none">
+    {# ── Статистика постов ── #}
+    <div class="row row-cards mb-3">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <span class="me-3" style="
-                            width:48px; height:48px; border-radius:12px;
-                            background:rgba(0,136,204,.12);
-                            display:flex; align-items:center; justify-content:center;
-                            font-size:1.4rem; color:#0088cc;">
-                            <i class="fa-brands fa-telegram"></i>
+                    <div class="d-flex align-items-center">
+                        <span class="me-3" style="width:44px;height:44px;border-radius:10px;background:rgba(32,107,196,.12);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#206bc4;">
+                            <i class="fa-solid fa-newspaper"></i>
                         </span>
                         <div>
+                            <div class="text-muted small">Всего постов</div>
+                            <div class="fw-bold fs-3">{{ posts_total }}</div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-3 text-muted small">
+                        <span><i class="fa-solid fa-pencil me-1 text-secondary"></i>Черновики: <strong>{{ posts_draft }}</strong></span>
+                        <span class="ms-auto"><i class="fa-solid fa-clock me-1 text-warning"></i>Готовы: <strong>{{ posts_ready }}</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-lg-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <span class="me-3" style="width:44px;height:44px;border-radius:10px;background:rgba(42,181,125,.12);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#2ab57d;">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </span>
+                        <div>
+                            <div class="text-muted small">Опубликовано</div>
+                            <div class="fw-bold fs-3">{{ posts_published }}</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-muted small">
+                        <i class="fa-solid fa-paper-plane me-1 text-success"></i>Публикаций в каналах: <strong>{{ ch_published }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-lg-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <span class="me-3" style="width:44px;height:44px;border-radius:10px;background:rgba(247,184,75,.12);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#f7b84b;">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                        </span>
+                        <div>
+                            <div class="text-muted small">В очереди</div>
+                            <div class="fw-bold fs-3">{{ ch_pending }}</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-muted small">
+                        <i class="fa-solid fa-rotate me-1 text-muted"></i>Воркер опрашивает каждые 30 с
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-lg-3">
+            <div class="card {% if ch_failed > 0 %}border-danger{% endif %}">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <span class="me-3" style="width:44px;height:44px;border-radius:10px;background:rgba(214,57,57,.12);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#d63939;">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </span>
+                        <div>
+                            <div class="text-muted small">Ошибок публикации</div>
+                            <div class="fw-bold fs-3 {% if ch_failed > 0 %}text-danger{% endif %}">{{ ch_failed }}</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-muted small">
+                        {% if ch_failed > 0 %}
+                        <span class="text-danger"><i class="fa-solid fa-circle-exclamation me-1"></i>Требует внимания</span>
+                        {% else %}
+                        <span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Всё в порядке</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Источники + последние публикации + ошибки ── #}
+    <div class="row row-cards">
+
+        {# Источники #}
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fa-solid fa-satellite-dish me-2 text-muted"></i>Источники публикации</h3>
+                </div>
+                <div class="card-body p-0">
+                    <a href="{{ request.url_for(__name__ ~ ':list', identity='telegram-source') }}"
+                       class="d-flex align-items-center px-4 py-3 text-decoration-none border-bottom source-row">
+                        <span style="width:36px;height:36px;border-radius:8px;background:rgba(0,136,204,.12);display:flex;align-items:center;justify-content:center;color:#0088cc;" class="me-3">
+                            <i class="fa-brands fa-telegram"></i>
+                        </span>
+                        <div class="flex-fill">
                             <div class="fw-semibold text-body">Telegram</div>
                             <div class="text-muted small">Каналы и группы</div>
                         </div>
-                    </div>
-                    <div class="text-muted small">Настройка источников публикации в Telegram</div>
+                        <span class="badge bg-blue-lt ms-2">{{ tg_count }}</span>
+                        <i class="fa-solid fa-chevron-right ms-2 text-muted small"></i>
+                    </a>
+                    <a href="{{ request.url_for(__name__ ~ ':list', identity='v-k-source') }}"
+                       class="d-flex align-items-center px-4 py-3 text-decoration-none border-bottom source-row">
+                        <span style="width:36px;height:36px;border-radius:8px;background:rgba(70,128,194,.12);display:flex;align-items:center;justify-content:center;color:#4680c2;" class="me-3">
+                            <i class="fa-brands fa-vk"></i>
+                        </span>
+                        <div class="flex-fill">
+                            <div class="fw-semibold text-body">ВКонтакте</div>
+                            <div class="text-muted small">Группы и паблики</div>
+                        </div>
+                        <span class="badge bg-blue-lt ms-2">{{ vk_count }}</span>
+                        <i class="fa-solid fa-chevron-right ms-2 text-muted small"></i>
+                    </a>
+                    <a href="{{ request.url_for(__name__ ~ ':list', identity='m-a-x-source') }}"
+                       class="d-flex align-items-center px-4 py-3 text-decoration-none source-row">
+                        <span style="width:36px;height:36px;border-radius:8px;background:rgba(91,94,166,.12);display:flex;align-items:center;justify-content:center;color:#5b5ea6;" class="me-3">
+                            <i class="fa-solid fa-message"></i>
+                        </span>
+                        <div class="flex-fill">
+                            <div class="fw-semibold text-body">MAX</div>
+                            <div class="text-muted small">Мессенджер</div>
+                        </div>
+                        <span class="badge bg-purple-lt ms-2">{{ max_count }}</span>
+                        <i class="fa-solid fa-chevron-right ms-2 text-muted small"></i>
+                    </a>
                 </div>
-            </a>
+            </div>
         </div>
 
-        <div class="col-sm-6 col-lg-4">
-            <div class="card h-100" style="border-style:dashed; opacity:.5;">
-                <div class="card-body d-flex align-items-center justify-content-center flex-column text-center py-4">
-                    <span style="
-                        width:48px; height:48px; border-radius:12px;
-                        background:#f1f5f9;
-                        display:flex; align-items:center; justify-content:center;
-                        font-size:1.4rem; color:#94a3b8; margin-bottom:.75rem;">
-                        <i class="fa fa-plus"></i>
-                    </span>
-                    <div class="fw-semibold text-muted">Источник появится здесь</div>
-                    <div class="text-muted small mt-1">ВКонтакте, Instagram и др.</div>
+        {# Последние публикации #}
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left me-2 text-muted"></i>Последние публикации</h3>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent %}
+                    {% for ch in recent %}
+                    <div class="d-flex align-items-start px-4 py-3 {% if not loop.last %}border-bottom{% endif %}">
+                        {% if ch.source_type == 'telegram' %}
+                        <i class="fa-brands fa-telegram mt-1 me-2" style="color:#0088cc;width:16px;"></i>
+                        {% elif ch.source_type == 'vk' %}
+                        <i class="fa-brands fa-vk mt-1 me-2" style="color:#4680c2;width:16px;"></i>
+                        {% else %}
+                        <i class="fa-solid fa-message mt-1 me-2" style="color:#5b5ea6;width:16px;"></i>
+                        {% endif %}
+                        <div class="flex-fill overflow-hidden">
+                            <div class="text-body text-truncate small fw-medium">{{ ch.effective_title }}</div>
+                            <div class="text-muted" style="font-size:.75rem;">
+                                {{ ch.published_at.strftime('%d.%m %H:%M') if ch.published_at else '—' }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="d-flex flex-column align-items-center justify-content-center text-center text-muted py-5">
+                        <i class="fa-regular fa-paper-plane mb-2" style="font-size:1.8rem;opacity:.35;"></i>
+                        <div class="small">Публикаций пока нет</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Ошибки #}
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fa-solid fa-triangle-exclamation me-2 text-muted"></i>Ошибки публикации</h3>
+                </div>
+                <div class="card-body p-0">
+                    {% if failed %}
+                    {% for ch in failed %}
+                    <div class="d-flex align-items-start px-4 py-3 {% if not loop.last %}border-bottom{% endif %}">
+                        {% if ch.source_type == 'telegram' %}
+                        <i class="fa-brands fa-telegram mt-1 me-2" style="color:#0088cc;width:16px;"></i>
+                        {% elif ch.source_type == 'vk' %}
+                        <i class="fa-brands fa-vk mt-1 me-2" style="color:#4680c2;width:16px;"></i>
+                        {% else %}
+                        <i class="fa-solid fa-message mt-1 me-2" style="color:#5b5ea6;width:16px;"></i>
+                        {% endif %}
+                        <div class="flex-fill overflow-hidden">
+                            <div class="text-body text-truncate small fw-medium">{{ ch.effective_title }}</div>
+                            <div class="text-danger text-truncate" style="font-size:.75rem;">
+                                {{ ch.error_message or 'Неизвестная ошибка' }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="d-flex flex-column align-items-center justify-content-center text-center text-muted py-5">
+                        <i class="fa-solid fa-circle-check mb-2" style="font-size:1.8rem;opacity:.35;"></i>
+                        <div class="small">Ошибок нет</div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
     </div>
 </div>
+
+<style>
+.source-row { transition: background .15s; }
+.source-row:hover { background: var(--tblr-bg-surface-secondary, #f6f8fb); }
+</style>
 {% endblock %}

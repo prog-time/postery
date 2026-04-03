@@ -1,9 +1,12 @@
+from datetime import datetime, timedelta
 from typing import Any
 
 import anyio
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
+from starlette.responses import Response
+from starlette.templating import Jinja2Templates
 from starlette_admin.contrib.sqla import Admin, ModelView
 from starlette_admin.views import CustomView, DropDown
 from starlette_admin import (
@@ -15,6 +18,7 @@ from starlette_admin.exceptions import FormValidationError
 from app.config import SECRET_KEY, TEMPLATES_DIR, STATICS_DIR
 from app.database import engine, SessionLocal
 from app.models import TelegramSource, VKSource, MAXSource, AdminUser, Role
+from app.models import Post, PostChannel, PostStatus, ChannelStatus
 from app.models.providers import AIProvider, ProviderType
 from app.auth import RoleAuthProvider, SuperadminOnly, EditorAccessMixin
 from app.views.posts import PostWizardView
@@ -41,12 +45,89 @@ def _do_deactivate_others(obj_id: int) -> None:
 
 class DashboardView(CustomView):
     def __init__(self, **kwargs):
-        kwargs.setdefault("label", "Главная")
+        kwargs.setdefault("label", "Аналитика")
+        kwargs.setdefault("icon", "fa-solid fa-chart-pie")
         super().__init__(
             path="/",
             template_path="dashboard.html",
-            add_to_menu=False,
+            add_to_menu=True,
             **kwargs,
+        )
+
+    async def render(self, request: Request, templates: Jinja2Templates) -> Response:
+        with SessionLocal() as db:
+            posts_total     = db.query(Post).count()
+            posts_draft     = db.query(Post).filter(Post.status == PostStatus.DRAFT).count()
+            posts_ready     = db.query(Post).filter(Post.status == PostStatus.READY).count()
+            posts_published = db.query(Post).filter(Post.status == PostStatus.PUBLISHED).count()
+
+            ch_pending   = db.query(PostChannel).filter(PostChannel.status == ChannelStatus.PENDING).count()
+            _cutoff = datetime.now() - timedelta(days=7)
+            ch_published = (
+                db.query(PostChannel)
+                .filter(
+                    PostChannel.status == ChannelStatus.PUBLISHED,
+                    PostChannel.published_at >= _cutoff,
+                )
+                .count()
+            )
+            ch_failed    = db.query(PostChannel).filter(PostChannel.status == ChannelStatus.FAILED).count()
+
+            tg_count  = db.query(TelegramSource).count()
+            vk_count  = db.query(VKSource).count()
+            max_count = db.query(MAXSource).count()
+
+            recent = [
+                {
+                    "source_type": ch.source_type,
+                    "title":       ch.effective_title,
+                    "published_at": ch.published_at,
+                }
+                for ch in (
+                    db.query(PostChannel)
+                    .filter(PostChannel.status == ChannelStatus.PUBLISHED)
+                    .order_by(PostChannel.published_at.desc())
+                    .limit(7)
+                    .all()
+                )
+            ]
+            failed = [
+                {
+                    "source_type":   ch.source_type,
+                    "title":         ch.effective_title,
+                    "error_message": ch.error_message,
+                }
+                for ch in (
+                    db.query(PostChannel)
+                    .filter(PostChannel.status == ChannelStatus.FAILED)
+                    .order_by(PostChannel.id.desc())
+                    .limit(7)
+                    .all()
+                )
+            ]
+            active_provider = (
+                db.query(AIProvider).filter(AIProvider.is_active.is_(True)).first()
+            )
+            active_provider_name = str(active_provider) if active_provider else None
+
+        return templates.TemplateResponse(
+            request=request,
+            name="dashboard.html",
+            context={
+                "posts_total":     posts_total,
+                "posts_draft":     posts_draft,
+                "posts_ready":     posts_ready,
+                "posts_published": posts_published,
+                "ch_pending":      ch_pending,
+                "ch_published":    ch_published,
+                "ch_failed":       ch_failed,
+                "tg_count":        tg_count,
+                "vk_count":        vk_count,
+                "max_count":       max_count,
+                "recent":          recent,
+                "failed":          failed,
+                "active_provider": active_provider_name,
+            },
         )
 
 
