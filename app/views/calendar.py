@@ -155,6 +155,6 @@ class CalendarView(CustomView):
                 "prev_month":    prev_month,
                 "next_year":     next_year,
                 "next_month":    next_month,
-                "js_data":       json.dumps(js_data, ensure_ascii=False),
+                "js_data":       json.dumps(js_data, ensure_ascii=False).replace("</", "<\\/"),
             },
         )
