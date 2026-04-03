@@ -1,5 +1,8 @@
+import logging
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
@@ -179,7 +182,16 @@ class PostWizardView(EditorAccessMixin, CustomView):
             for img, content in validated:
                 upload_dir = UPLOAD_DIR / str(post.id)
                 upload_dir.mkdir(parents=True, exist_ok=True)
-                dest = upload_dir / img.filename
+
+                safe_name = Path(img.filename).name
+                if not safe_name:
+                    logger.warning("Пропущен файл с небезопасным именем: %r", img.filename)
+                    continue
+                dest = upload_dir / safe_name
+                if not dest.resolve().is_relative_to(upload_dir.resolve()):
+                    logger.warning("Path traversal заблокирован: %r → %s", img.filename, dest)
+                    continue
+
                 dest.write_bytes(content)
                 order = len(post.images)
                 db.add(PostImage(
