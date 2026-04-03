@@ -18,7 +18,7 @@
 
                 {# ── Шапка: поиск + кнопка ──────────────────────────────────── #}
                 <div class="card-header d-flex align-items-center gap-3 flex-wrap">
-                    <form method="GET" action="{{ list_url }}" id="search-form" class="d-flex" style="width:260px;">
+                    <form method="GET" action="{{ list_url }}" id="search-form" class="d-flex search-form-wrap">
                         <div class="input-icon w-100">
                             <span class="input-icon-addon">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24"
@@ -39,15 +39,15 @@
                     </form>
 
                     {% if failed_count %}
-                    <span class="badge bg-red-lt text-red d-inline-flex align-items-center gap-1"
+                    <span class="badge bg-red-lt text-red d-inline-flex align-items-center gap-1 posts-error-badge"
                           style="font-size:.8rem;padding:.35rem .65rem;border-radius:20px;">
                         <i class="fa-solid fa-triangle-exclamation"></i>
                         {{ failed_count }} ошибок публикации
                     </span>
                     {% endif %}
 
-                    <div class="ms-auto">
-                        <a href="/admin/posts/wizard" class="btn btn-primary">
+                    <div class="ms-auto posts-create-wrap">
+                        <a href="/admin/posts/wizard" class="btn btn-primary posts-create-btn">
                             <i class="fa-solid fa-plus me-2"></i>Создать пост
                         </a>
                     </div>
@@ -56,7 +56,7 @@
                 {# ── Панель фильтров ─────────────────────────────────────────── #}
                 {%- set active_filters = (filter_source != '') | int + (filter_status != '') | int -%}
                 <div class="card-header border-top-0" style="background:#f8fafc;">
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <div class="d-flex align-items-center gap-2 flex-wrap filter-panel">
 
                         {# Источник — одиночный select #}
                         <select class="form-select filter-select" name="source" id="filter-source" style="width:220px;">
@@ -150,42 +150,40 @@
                                     {% if post.channels %}
                                     <div class="ch-list">
                                         {% for ch in post.channels %}
+
                                         <div class="ch-item">
-                                            {# Иконка платформы #}
-                                            <i class="{{ ch.source_icon }} ch-platform-icon
+                                            <a href="/admin/posts/wizard?post_id={{ post.post_id }}&step=3&channel_id={{ ch.channel_id }}&from_list=1">
+                                                {# Иконка платформы #}
+                                                <i class="{{ ch.source_icon }} ch-platform-icon
                                                 {%- if ch.source_type == 'telegram' %} ch-icon--tg
                                                 {%- elif ch.source_type == 'vk' %} ch-icon--vk
                                                 {%- else %} ch-icon--max{% endif %}"></i>
 
-                                            {# Название источника #}
-                                            <span class="ch-src-name">{{ ch.source_name }}</span>
+                                                {# Название источника #}
+                                                <span class="ch-src-name">{{ ch.source_name }}</span>
 
-                                            {# Статус #}
-                                            {% set cs = ch.ch_status %}
-                                            {% if cs == 'pending' %}
+                                                {# Статус #}
+                                                {% set cs = ch.ch_status %}
+                                                {% if cs == 'pending' %}
                                                 <span class="status-badge status-badge--sm" style="color:#f59e0b;background:rgba(245,158,11,.13);">Запланирован</span>
-                                            {% elif cs == 'published' %}
+                                                {% elif cs == 'published' %}
                                                 <span class="status-badge status-badge--sm" style="color:#22c55e;background:rgba(34,197,94,.13);">Опубликован</span>
-                                            {% elif cs == 'failed' %}
+                                                {% elif cs == 'failed' %}
                                                 <span class="status-badge status-badge--sm" style="color:#ef4444;background:rgba(239,68,68,.13);"
                                                       {% if ch.error_msg %}data-bs-toggle="tooltip" data-bs-placement="top" title="{{ ch.error_msg[:100] }}"{% endif %}>
                                                     <i class="fa-solid fa-triangle-exclamation" style="font-size:.7rem;"></i> Ошибка
                                                 </span>
-                                            {% endif %}
+                                                {% endif %}
 
-                                            {# Дата #}
-                                            <span class="ch-date">
-                                                {% if ch.published_at %}{{ ch.published_at.strftime('%d.%m %H:%M') }}
-                                                {% elif ch.scheduled_at %}{{ ch.scheduled_at.strftime('%d.%m %H:%M') }}
-                                                {% else %}—{% endif %}
-                                            </span>
-
+                                                {# Дата #}
+                                                <span class="ch-date">
+                                                    {% if ch.published_at %}{{ ch.published_at.strftime('%d.%m %H:%M') }}
+                                                    {% elif ch.scheduled_at %}{{ ch.scheduled_at.strftime('%d.%m %H:%M') }}
+                                                    {% else %}—{% endif %}
+                                                </span>
+                                            </a>
                                             {# Действия канала #}
                                             <div class="ch-actions">
-                                                <a href="/admin/posts/wizard?post_id={{ post.post_id }}&step=3&channel_id={{ ch.channel_id }}&from_list=1"
-                                                   class="ch-btn" title="Редактировать источник">
-                                                    <i class="fa-solid fa-pen-to-square"></i>
-                                                </a>
                                                 <button type="button" class="ch-btn btn-republish"
                                                         data-post-id="{{ post.post_id }}"
                                                         data-channel-id="{{ ch.channel_id }}"
@@ -203,6 +201,7 @@
                                                 </button>
                                             </div>
                                         </div>
+
                                         {% endfor %}
                                         <a href="/admin/posts/add-channel?post_id={{ post.post_id }}"
                                            class="ch-add-btn">
@@ -375,7 +374,7 @@
         align-items: center;
         gap: .3rem;
         padding: .2rem .6rem;
-        border-radius: 20px;
+        border-radius: 6px;
         font-size: .775rem;
         font-weight: 500;
         white-space: nowrap;
@@ -425,8 +424,18 @@
         background: #f8fafc;
         font-size: .82rem;
         min-width: 0;
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
     }
-    .ch-item:hover { background: #f1f5f9; }
+    .ch-item a {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        column-gap: 10px;
+        text-decoration: none;
+    }
+    .ch-item:hover { background: #f1f5f9; color: inherit; text-decoration: none; }
     .ch-item:hover .ch-actions { opacity: 1; }
 
     .ch-platform-icon { font-size: .9rem; flex-shrink: 0; }
@@ -445,7 +454,7 @@
     .ch-actions {
         display: flex; gap: .1rem; flex-shrink: 0;
         opacity: 0; transition: opacity .15s;
-        margin-left: .25rem;
+        margin: 3px 0 3px auto;
     }
     .ch-btn {
         background: none; border: none; padding: .15rem .3rem;
@@ -455,6 +464,89 @@
     }
     .ch-btn:hover { background: #e2e8f0; }
     .ch-btn:focus { outline: none; box-shadow: none; }
+
+    /* ── Desktop: фиксированная ширина поиска ── */
+    .search-form-wrap { width: 260px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 767.98px) {
+        /* Шапка карточки — мобиль */
+        .card-header.d-flex.flex-wrap { gap: .5rem !important; }
+        .posts-create-wrap { width: 100%; margin-left: 0 !important; }
+        .posts-create-btn  { width: 100%; justify-content: center; }
+        .posts-error-badge { width: 100%; justify-content: center; }
+
+        /* Поиск и фильтры */
+        .search-form-wrap { width: 100%; }
+        .filter-panel { flex-direction: column; align-items: stretch !important; width: 100%; }
+        .filter-panel .form-select { width: 100% !important; }
+        .filter-panel .btn { align-self: flex-start; }
+
+        /* Таблица постов → колонки */
+        .table-responsive { overflow-x: hidden; }
+        .table { width: 100%; table-layout: fixed; }
+        .table thead { display: none; }
+        .table tbody,
+        .table tbody tr.post-row { display: block; width: 100%; }
+
+        .table tbody tr.post-row {
+            position: relative;
+            padding: 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            box-sizing: border-box;
+        }
+
+        .table tbody tr.post-row > td {
+            display: block;
+            padding: 0;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        /* ID — скрыть */
+        .table tbody tr.post-row > td:nth-child(1) { display: none; }
+
+        /* Заголовок — отступ справа под кнопку удаления */
+        .table tbody tr.post-row > td:nth-child(2) {
+            display: flex;
+            flex-direction: column;
+            padding-right: 2rem;
+            font-size: .82rem;
+        }
+        /* Статус — перед заголовком */
+        .table tbody tr.post-row > td:nth-child(2) > a.post-title-link { order: 2; font-size: .82rem; }
+        .table tbody tr.post-row > td:nth-child(2) > div:first-of-type  { order: 1; margin-top: 0; margin-bottom: .25rem; }
+        .table tbody tr.post-row > td:nth-child(2) > div:last-of-type   { order: 3; }
+        .table tbody tr.post-row > td:nth-child(2) .status-badge { font-size: .7rem; }
+        .table tbody tr.post-row > td:nth-child(2) .post-tag { font-size: .65rem; }
+
+        /* Каналы */
+        .table tbody tr.post-row > td:nth-child(3) { padding-top: .6rem; }
+        .table tbody tr.post-row > td:nth-child(3) .ch-item { font-size: .75rem; }
+        .table tbody tr.post-row > td:nth-child(3) .ch-src-name { max-width: 100px; font-size: .75rem; }
+        .table tbody tr.post-row > td:nth-child(3) .status-badge--sm { font-size: .68rem; }
+
+        /* Дата */
+        .table tbody tr.post-row > td:nth-child(4) {
+            padding-top: .5rem;
+            font-size: .72rem !important;
+            color: #94a3b8;
+        }
+
+        /* Кнопка удаления поста */
+        .table tbody tr.post-row > td:nth-child(5) {
+            position: absolute;
+            top: 1rem;
+            right: .75rem;
+            width: auto;
+            padding: 0;
+        }
+
+        /* ch-actions — скрыть на мобиле */
+        .ch-actions { display: none !important; }
+    }
 
     .ch-add-btn {
         display: inline-flex;
