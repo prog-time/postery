@@ -90,17 +90,19 @@ class PostChannelListView(CustomView):
 
         # Для пагинации считаем по постам, а не по строкам
         total_pages = max(1, ceil(total_posts / _PER_PAGE))
+        failed_count = sum(1 for r in rows if r["ch_status"] == "failed")
 
         return templates.TemplateResponse(
             request=request,
             name="posts/channel_list.html",
             context={
-                "rows":        rows,
-                "page":        page,
-                "total_pages": total_pages,
-                "total_posts": total_posts,
-                "search":      search,
-                "list_url":    _LIST_URL,
+                "rows":         rows,
+                "page":         page,
+                "total_pages":  total_pages,
+                "total_posts":  total_posts,
+                "search":       search,
+                "list_url":     _LIST_URL,
+                "failed_count": failed_count,
             },
         )
 
@@ -122,7 +124,7 @@ def _build_row(post: Post, channel: PostChannel | None,
 
     return {
         "post_id":       post.id,
-        "post_title":    post.title,
+        "post_title":    (channel.title or post.title) if channel else post.title,
         "post_tags":     post.tags,
         "post_status":   post.status.value,
         "post_created":  post.created_at,

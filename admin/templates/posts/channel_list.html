@@ -16,8 +16,8 @@
         <div class="col-12">
             <div class="card">
 
-                {# ── Шапка: поиск + кнопка ──────────────────────────────────── #}
-                <div class="card-header d-flex align-items-center gap-3">
+                {# ── Шапка: поиск + счётчик ошибок + кнопка ────────────────── #}
+                <div class="card-header d-flex align-items-center gap-3 flex-wrap">
                     <form method="GET" action="{{ list_url }}" class="d-flex" style="width:260px;">
                         <div class="input-icon w-100">
                             <span class="input-icon-addon">
@@ -35,6 +35,14 @@
                         </div>
                     </form>
 
+                    {% if failed_count %}
+                    <span class="badge bg-red-lt text-red d-inline-flex align-items-center gap-1"
+                          style="font-size:.8rem;padding:.35rem .65rem;border-radius:20px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        {{ failed_count }} ошибок публикации
+                    </span>
+                    {% endif %}
+
                     <div class="ms-auto">
                         <a href="/admin/posts/wizard" class="btn btn-primary">
                             <i class="fa-solid fa-plus me-2"></i>Создать пост
@@ -44,14 +52,13 @@
 
                 {# ── Таблица ────────────────────────────────────────────────── #}
                 <div class="table-responsive">
-                    <table class="table table-vcenter table-hover text-nowrap mb-0">
+                    <table class="table table-vcenter text-nowrap mb-0">
                         <thead>
                             <tr>
                                 <th style="width:36px;" class="text-muted">ID</th>
                                 <th>Заголовок</th>
                                 <th style="width:180px;">Источник</th>
-                                <th style="width:130px;">Статус поста</th>
-                                <th style="width:140px;">Статус канала</th>
+                                <th style="width:140px;">Статус</th>
                                 <th style="width:150px;">Запланирован</th>
                                 <th style="width:140px;">Создан</th>
                                 <th style="width:80px;"></th>
@@ -61,7 +68,7 @@
                         {% if rows %}
                             {% for row in rows %}
                             <tr>
-                                <td class="text-muted">{{ row.post_id }}</td>
+                                <td class="text-muted" style="font-size:.8rem;">#{{ row.post_id }}</td>
 
                                 {# Заголовок + теги #}
                                 <td>
@@ -90,39 +97,25 @@
                                     {% endif %}
                                 </td>
 
-                                {# Статус поста #}
-                                <td>
-                                    {% set ps = row.post_status %}
-                                    {% if ps == 'draft' %}
-                                        <span class="status-badge" style="color:#94a3b8;background:rgba(148,163,184,.13);">
-                                            <i class="fa-solid fa-pen-line" style="font-size:.7rem;"></i>Черновик
-                                        </span>
-                                    {% elif ps == 'ready' %}
-                                        <span class="status-badge" style="color:#6366f1;background:rgba(99,102,241,.13);">
-                                            <i class="fa-solid fa-circle-check" style="font-size:.7rem;"></i>Готов
-                                        </span>
-                                    {% elif ps == 'published' %}
-                                        <span class="status-badge" style="color:#22c55e;background:rgba(34,197,94,.13);">
-                                            <i class="fa-solid fa-paper-plane" style="font-size:.7rem;"></i>Опубликован
-                                        </span>
-                                    {% endif %}
-                                </td>
-
-                                {# Статус канала #}
+                                {# Статус #}
                                 <td>
                                     {% set cs = row.ch_status %}
                                     {% if cs == 'pending' %}
                                         <span class="status-badge" style="color:#f59e0b;background:rgba(245,158,11,.13);">
-                                            <i class="fa-solid fa-clock" style="font-size:.7rem;"></i>Ожидает
+                                            Ожидает
                                         </span>
                                     {% elif cs == 'published' %}
                                         <span class="status-badge" style="color:#22c55e;background:rgba(34,197,94,.13);">
-                                            <i class="fa-solid fa-paper-plane" style="font-size:.7rem;"></i>Опубликован
+                                            Опубликован
                                         </span>
                                     {% elif cs == 'failed' %}
                                         <span class="status-badge" style="color:#ef4444;background:rgba(239,68,68,.13);"
-                                              {% if row.error_msg %}title="{{ row.error_msg }}"{% endif %}>
-                                            <i class="fa-solid fa-circle-xmark" style="font-size:.7rem;"></i>Ошибка
+                                              {% if row.error_msg %}
+                                              data-bs-toggle="tooltip" data-bs-placement="top"
+                                              title="{{ row.error_msg[:100] }}"
+                                              {% endif %}>
+                                            <i class="fa-solid fa-triangle-exclamation" style="font-size:.75rem;"></i>
+                                            Ошибка
                                         </span>
                                     {% else %}
                                         <span class="text-muted">—</span>
@@ -196,8 +189,8 @@
                             </tr>
                             {% endfor %}
                         {% else %}
-                            <tr>
-                                <td colspan="8" class="text-center py-5">
+                            <tr class="no-hover">
+                                <td colspan="7" class="text-center py-5">
                                     {% if search %}
                                         <i class="fa-solid fa-magnifying-glass" style="font-size:2rem;color:#94a3b8;display:block;margin-bottom:.75rem;"></i>
                                         <div class="text-muted fw-medium">Ничего не найдено</div>
@@ -351,7 +344,8 @@
         pointer-events: none;
     }
     .pag-sep { color: #cbd5e1; font-size: .85rem; padding: 0 .2rem; }
-    table tbody tr { cursor: pointer; }
+    table tbody tr:not(.no-hover) { cursor: pointer; }
+    table tbody tr.no-hover:hover > td { background: transparent !important; }
     .row-action-btn--row_action_3_delete { color: #ef4444 !important; }
     .btn-republish,
     .btn-delete {
@@ -372,6 +366,9 @@
 {{ super() }}
 <script>
 (function () {
+    // Тултипы для бейджей FAILED
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
     // Клик по строке → редактирование (через ссылку карандаша в той же строке)
     document.querySelectorAll('tbody tr').forEach(tr => {
         tr.addEventListener('click', function (e) {
