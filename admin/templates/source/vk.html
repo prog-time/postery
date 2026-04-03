@@ -22,7 +22,7 @@
                 {% set form_action = (wizard_url ~ '?pk=' ~ source.id) if editing else wizard_url %}
                 <form action="{{ form_action }}" method="POST">
                     {% if editing %}
-                    <div class="card-header p-0 border-top">
+                    <div class="card-header">
                         <ul class="nav nav-tabs card-header-tabs px-3" role="tablist">
                             <li class="nav-item">
                                 <a class="nav-link active" data-bs-toggle="tab" href="#tab-params" role="tab">
@@ -31,7 +31,7 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" data-bs-toggle="tab" href="#tab-ai" role="tab">
-                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI промпты
+                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Настройки AI
                                 </a>
                             </li>
                         </ul>
@@ -88,7 +88,7 @@
     function showMsg(ok, text) {
         statusDiv.style.display = 'block';
         msgDiv.className = ok ? 'alert alert-success mb-0' : 'alert alert-danger mb-0';
-        msgDiv.innerHTML = `<i class="fa-solid ${ok ? 'fa-check-circle' : 'fa-times-circle'} me-2"></i>${text}`;
+        msgDiv.innerHTML = `<i class="fa-solid ${ok ? 'fa-check-circle' : 'fa-times-circle'}" style="display:flex;${ok ? 'color:#2ab57d;' : ''}"></i>${text}`;
     }
 
     function lockSave() {
