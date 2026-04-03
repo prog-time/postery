@@ -1,6 +1,5 @@
 {% extends "layout.html" %}
 {% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
-{% from "_markdown_editor.html" import markdown_editor %}
 
 {% block header %}
 <div class="d-flex justify-content-between align-items-center">
@@ -59,11 +58,8 @@
                                 Текст
                                 {{ ai_btn("description") }}
                             </label>
-                            {{ markdown_editor(
-                                "description",
-                                value=channel.description or post.description or '',
-                                rows=6
-                            ) }}
+                            <textarea name="description" class="form-control" rows="6"
+                                      >{{ channel.description or post.description or '' }}</textarea>
                         </div>
 
                         <div class="mb-0">

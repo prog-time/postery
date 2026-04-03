@@ -1,6 +1,5 @@
 {% extends "layout.html" %}
 {% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
-{% from "_markdown_editor.html" import markdown_editor %}
 
 {% block header %}
 <div class="row align-items-center mb-2">
@@ -82,11 +81,8 @@
                         Текст
                         {{ ai_btn("description") }}
                     </label>
-                    {{ markdown_editor(
-                        "description",
-                        value=channel.description or post.description or '',
-                        rows=15
-                    ) }}
+                    <textarea name="description" class="form-control" rows="15"
+                              >{{ channel.description or post.description or '' }}</textarea>
                 </div>
 
                 <div class="mb-0">
