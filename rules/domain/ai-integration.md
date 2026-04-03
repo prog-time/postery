@@ -29,6 +29,7 @@ The AI layer allows users to rewrite post titles and descriptions using a config
 | is_active | Only one provider may be active at a time |
 | ai_prompt_title | System prompt used when AI rewrites a post title for a specific source |
 | ai_prompt_description | System prompt used when AI rewrites a description for a specific source |
+| base_prompt | Global base system prompt stored on `AIProvider`. Applied to every generation request, prepended before source/custom prompt. |
 | field | `"title"` or `"description"` — determines which prompt column to read |
 | GigaChat OAuth token | Short-lived access token fetched per request, never stored |
 
@@ -54,8 +55,11 @@ _Enforced in:_ `app/routers/ai_generate.py @ generate_text()`
 **BR-006** — The `field` parameter determines which prompt column to read when no custom prompt is supplied: `"title"` → `source.ai_prompt_title`; `"description"` → `source.ai_prompt_description`. Custom `prompt` always takes precedence over the source-level prompt.
 _Enforced in:_ `app/routers/ai_generate.py @ generate_text()`
 
-**BR-007** — If the source does not exist or the prompt is NULL/empty (and no custom prompt provided), call the provider without a system message. Do not fail.
+**BR-007** — If the source does not exist or the prompt is NULL/empty (and no custom prompt provided), the system message is set to `base_prompt` alone (if present) or `None`. Do not fail.
 _Enforced in:_ `app/routers/ai_generate.py @ generate_text()`
+
+**BR-014** — The `base_prompt` field on `AIProvider` is a global system instruction applied to every generation request. It is prepended before the source/custom prompt with a double newline separator: `system_msg = base_prompt + "\n\n" + ai_prompt`. If only `base_prompt` is set, it becomes the sole system message. If both are empty, `system_msg` is `None`.
+_Enforced in:_ `app/routers/ai_generate.py @ generate_text()`; editable via `AIProviderWizardView` (both openai.html and gigachat.html templates).
 
 **BR-013** — If the request body contains a non-empty `prompt` field, use it as the system message and skip source prompt lookup entirely.
 _Enforced in:_ `app/routers/ai_generate.py @ generate_text()`

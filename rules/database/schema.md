@@ -109,6 +109,7 @@ erDiagram
         text api_key
         string base_url
         string scope
+        text base_prompt
         bool is_active
         datetime created_at
     }
@@ -265,6 +266,7 @@ erDiagram
 | api_key | TEXT (encrypted) | No | — | OpenAI secret key (`sk-...`) or GigaChat Authorization key (Base64). Stored encrypted. |
 | base_url | VARCHAR(512) | Yes | NULL | Custom OpenAI-compatible endpoint (Azure, proxy). NULL = `https://api.openai.com` |
 | scope | VARCHAR(64) | Yes | NULL | GigaChat scope: `GIGACHAT_API_PERS` or `GIGACHAT_API_CORP` |
+| base_prompt | TEXT | Yes | NULL | Global base system prompt. Prepended before source/custom prompt for every generation request. Added via `_migrate()`. |
 | is_active | BOOLEAN | No | `False` | Only one active provider enforced by `after_create`/`after_edit` hooks |
 | created_at | DATETIME | No | utcnow | Creation timestamp |
 

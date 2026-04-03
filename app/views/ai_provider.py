@@ -64,10 +64,11 @@ class AIProviderWizardView(CustomView):
 
     async def _post_create(self, request, templates, provider_type, wizard_url):
         form    = await request.form()
-        api_key  = (form.get("api_key") or "").strip()
-        base_url = (form.get("base_url") or "").strip() or None
-        scope    = (form.get("scope") or "").strip() or None
-        is_active = form.get("is_active") == "on"
+        api_key     = (form.get("api_key") or "").strip()
+        base_url    = (form.get("base_url") or "").strip() or None
+        scope       = (form.get("scope") or "").strip() or None
+        base_prompt = (form.get("base_prompt") or "").strip() or None
+        is_active   = form.get("is_active") == "on"
 
         errors: dict[str, str] = {}
         if not api_key:
@@ -92,6 +93,7 @@ class AIProviderWizardView(CustomView):
                 api_key=api_key,
                 base_url=base_url,
                 scope=scope,
+                base_prompt=base_prompt,
                 is_active=is_active,
             ))
             db.commit()
@@ -108,11 +110,12 @@ class AIProviderWizardView(CustomView):
             # detach a plain copy of needed attributes
             provider_type = provider.provider_type.value
             provider_data = {
-                "id":        provider.id,
+                "id":          provider.id,
                 "provider_type": provider_type,
-                "base_url":  provider.base_url,
-                "scope":     provider.scope,
-                "is_active": provider.is_active,
+                "base_url":    provider.base_url,
+                "scope":       provider.scope,
+                "base_prompt": provider.base_prompt,
+                "is_active":   provider.is_active,
             }
 
         if request.method == "POST":
@@ -123,19 +126,21 @@ class AIProviderWizardView(CustomView):
 
     async def _post_edit(self, request, templates, pk, provider_type,
                          provider_data, wizard_url):
-        form     = await request.form()
-        api_key  = (form.get("api_key") or "").strip()
-        base_url = (form.get("base_url") or "").strip() or None
-        scope    = (form.get("scope") or "").strip() or None
-        is_active = form.get("is_active") == "on"
+        form        = await request.form()
+        api_key     = (form.get("api_key") or "").strip()
+        base_url    = (form.get("base_url") or "").strip() or None
+        scope       = (form.get("scope") or "").strip() or None
+        base_prompt = (form.get("base_prompt") or "").strip() or None
+        is_active   = form.get("is_active") == "on"
 
         with SessionLocal() as db:
             provider = db.get(AIProvider, pk)
             if api_key:
                 provider.api_key = api_key
-            provider.base_url  = base_url
-            provider.scope     = scope
-            provider.is_active = is_active
+            provider.base_url    = base_url
+            provider.scope       = scope
+            provider.base_prompt = base_prompt
+            provider.is_active   = is_active
             if is_active:
                 db.query(AIProvider).filter(AIProvider.id != pk).update(
                     {"is_active": False}

@@ -41,6 +41,8 @@ def _migrate() -> None:
         ("telegram_sources", "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
         ("vk_sources",       "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
         ("max_sources",      "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
+        # BASE-PROMPT: global base system prompt per AI provider
+        ("ai_providers",     "base_prompt",           "TEXT"),
     ]
     with engine.connect() as conn:
         for table, column, col_type in migrations:

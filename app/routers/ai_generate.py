@@ -52,6 +52,8 @@ async def generate_text(request: Request, body: GenerateRequest):
         if not provider:
             return {"ok": False, "error": "Нет активного AI провайдера"}
 
+        base_prompt = (provider.base_prompt or "").strip()
+
         if body.prompt is not None and body.prompt.strip():
             ai_prompt = body.prompt.strip()
         else:
@@ -65,7 +67,17 @@ async def generate_text(request: Request, body: GenerateRequest):
             else:
                 ai_prompt = ""
 
-    system_msg = ai_prompt if ai_prompt else None
+    # Комбинирование базового и контекстного промптов:
+    # base_prompt всегда идёт первым (глобальные инструкции),
+    # за ним — source/custom prompt (контекст конкретного запроса).
+    if base_prompt and ai_prompt:
+        system_msg = base_prompt + "\n\n" + ai_prompt
+    elif base_prompt:
+        system_msg = base_prompt
+    elif ai_prompt:
+        system_msg = ai_prompt
+    else:
+        system_msg = None
     user_msg = body.text.strip()
 
     if not user_msg:
