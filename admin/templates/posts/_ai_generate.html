@@ -207,12 +207,13 @@
     });
 
     // Автозапуск — если источник настроен на auto_generate (TASK-008)
+    // block script выполняется после DOMContentLoaded, поэтому используем setTimeout
     {% if auto_generate %}
-    document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () {
         runGenerate('title', null).then(function () {
             runGenerate('description', null);
         });
-    });
+    }, 0);
     {% endif %}
 })();
 </script>
