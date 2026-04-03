@@ -52,145 +52,130 @@
 
                 {# ── Таблица ────────────────────────────────────────────────── #}
                 <div class="table-responsive">
-                    <table class="table table-vcenter text-nowrap mb-0">
+                    <table class="table table-vcenter mb-0">
                         <thead>
                             <tr>
-                                <th style="width:36px;" class="text-muted">ID</th>
+                                <th style="width:40px;" class="text-muted">ID</th>
                                 <th>Заголовок</th>
-                                <th style="width:180px;">Источник</th>
-                                <th style="width:140px;">Статус</th>
-                                <th style="width:150px;">Запланирован</th>
-                                <th style="width:140px;">Создан</th>
-                                <th style="width:80px;"></th>
+                                <th>Публикации</th>
+                                <th style="width:130px;">Создан</th>
+                                <th style="width:36px;"></th>
                             </tr>
                         </thead>
                         <tbody>
-                        {% if rows %}
-                            {% for row in rows %}
-                            <tr>
-                                <td class="text-muted" style="font-size:.8rem;">#{{ row.post_id }}</td>
+                        {% if post_rows %}
+                            {% for post in post_rows %}
+                            <tr class="post-row">
+                                {# ID #}
+                                <td class="text-muted align-top" style="font-size:.8rem;padding-top:.85rem;">#{{ post.post_id }}</td>
 
-                                {# Заголовок + теги #}
-                                <td>
-                                    <div class="fw-semibold" style="max-width:340px;white-space:normal;line-height:1.3;">
-                                        {{ row.post_title }}
+                                {# Заголовок + теги + статус поста #}
+                                <td class="align-top" style="white-space:normal;">
+                                    <a href="/admin/posts/wizard?post_id={{ post.post_id }}&step=1"
+                                       class="fw-semibold text-reset text-decoration-none post-title-link"
+                                       style="line-height:1.35;display:block;">{{ post.post_title }}</a>
+                                    <div class="d-flex flex-wrap gap-1 mt-1">
+                                        {% set ps = post.post_status %}
+                                        {% if ps == 'draft' %}
+                                            <span class="status-badge" style="color:#94a3b8;background:rgba(148,163,184,.13);">Черновик</span>
+                                        {% elif ps == 'ready' %}
+                                            <span class="status-badge" style="color:#6366f1;background:rgba(99,102,241,.13);">Готов</span>
+                                        {% elif ps == 'published' %}
+                                            <span class="status-badge" style="color:#22c55e;background:rgba(34,197,94,.13);">Опубликован</span>
+                                        {% endif %}
+                                        {% if post.post_tags %}
+                                            {% for tag in post.post_tags.split(',') %}
+                                                <span class="badge bg-blue-lt text-blue" style="font-size:.7rem;">{{ tag.strip() }}</span>
+                                            {% endfor %}
+                                        {% endif %}
                                     </div>
-                                    {% if row.post_tags %}
-                                        <div class="mt-1" style="white-space:normal;">
-                                        {% for tag in row.post_tags.split(',') %}
-                                            <span class="badge bg-blue-lt text-blue me-1" style="font-size:.7rem;">{{ tag.strip() }}</span>
-                                        {% endfor %}
+                                </td>
+
+                                {# Вложенные каналы #}
+                                <td class="align-top" style="white-space:normal;padding:.5rem .5rem .5rem 0;">
+                                    {% if post.channels %}
+                                    <div class="ch-list">
+                                        {% for ch in post.channels %}
+                                        <div class="ch-item">
+                                            {# Иконка платформы #}
+                                            <i class="{{ ch.source_icon }} ch-platform-icon
+                                                {%- if ch.source_type == 'telegram' %} ch-icon--tg
+                                                {%- elif ch.source_type == 'vk' %} ch-icon--vk
+                                                {%- else %} ch-icon--max{% endif %}"></i>
+
+                                            {# Название источника #}
+                                            <span class="ch-src-name">{{ ch.source_name }}</span>
+
+                                            {# Статус #}
+                                            {% set cs = ch.ch_status %}
+                                            {% if cs == 'pending' %}
+                                                <span class="status-badge status-badge--sm" style="color:#f59e0b;background:rgba(245,158,11,.13);">Ожидает</span>
+                                            {% elif cs == 'published' %}
+                                                <span class="status-badge status-badge--sm" style="color:#22c55e;background:rgba(34,197,94,.13);">Опубликован</span>
+                                            {% elif cs == 'failed' %}
+                                                <span class="status-badge status-badge--sm" style="color:#ef4444;background:rgba(239,68,68,.13);"
+                                                      {% if ch.error_msg %}data-bs-toggle="tooltip" data-bs-placement="top" title="{{ ch.error_msg[:100] }}"{% endif %}>
+                                                    <i class="fa-solid fa-triangle-exclamation" style="font-size:.7rem;"></i> Ошибка
+                                                </span>
+                                            {% endif %}
+
+                                            {# Дата #}
+                                            <span class="ch-date">
+                                                {% if ch.published_at %}{{ ch.published_at.strftime('%d.%m %H:%M') }}
+                                                {% elif ch.scheduled_at %}{{ ch.scheduled_at.strftime('%d.%m %H:%M') }}
+                                                {% else %}—{% endif %}
+                                            </span>
+
+                                            {# Действия канала #}
+                                            <div class="ch-actions">
+                                                <a href="/admin/posts/wizard?post_id={{ post.post_id }}&step=3&channel_id={{ ch.channel_id }}&from_list=1"
+                                                   class="ch-btn" title="Редактировать источник">
+                                                    <i class="fa-solid fa-pen-to-square"></i>
+                                                </a>
+                                                <button type="button" class="ch-btn btn-republish"
+                                                        data-post-id="{{ post.post_id }}"
+                                                        data-channel-id="{{ ch.channel_id }}"
+                                                        data-source-name="{{ ch.source_name }}"
+                                                        data-post-title="{{ post.post_title }}"
+                                                        title="Перепубликовать">
+                                                    <i class="fa-solid fa-rotate-right" style="color:#6366f1;"></i>
+                                                </button>
+                                                <button type="button" class="ch-btn btn-delete"
+                                                        data-channel-id="{{ ch.channel_id }}"
+                                                        data-source-name="{{ ch.source_name }}"
+                                                        data-post-title="{{ post.post_title }}"
+                                                        title="Удалить источник">
+                                                    <i class="fa-solid fa-trash" style="color:#ef4444;"></i>
+                                                </button>
+                                            </div>
                                         </div>
-                                    {% endif %}
-                                </td>
-
-                                {# Источник #}
-                                <td>
-                                    {% if row.source_name %}
-                                        <span class="d-flex align-items-center gap-1">
-                                            <i class="{{ row.source_icon }}" style="font-size:.85rem;color:#64748b;"></i>
-                                            <span>{{ row.source_name }}</span>
-                                        </span>
-                                        <small class="text-muted">{{ row.source_label }}</small>
+                                        {% endfor %}
+                                    </div>
                                     {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
-
-                                {# Статус #}
-                                <td>
-                                    {% set cs = row.ch_status %}
-                                    {% if cs == 'pending' %}
-                                        <span class="status-badge" style="color:#f59e0b;background:rgba(245,158,11,.13);">
-                                            Ожидает
-                                        </span>
-                                    {% elif cs == 'published' %}
-                                        <span class="status-badge" style="color:#22c55e;background:rgba(34,197,94,.13);">
-                                            Опубликован
-                                        </span>
-                                    {% elif cs == 'failed' %}
-                                        <span class="status-badge" style="color:#ef4444;background:rgba(239,68,68,.13);"
-                                              {% if row.error_msg %}
-                                              data-bs-toggle="tooltip" data-bs-placement="top"
-                                              title="{{ row.error_msg[:100] }}"
-                                              {% endif %}>
-                                            <i class="fa-solid fa-triangle-exclamation" style="font-size:.75rem;"></i>
-                                            Ошибка
-                                        </span>
-                                    {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
-
-                                {# Запланирован / опубликован #}
-                                <td class="text-muted" style="font-size:.85rem;">
-                                    {% if row.published_at %}
-                                        {{ row.published_at.strftime('%d.%m.%Y %H:%M') }}
-                                    {% elif row.scheduled_at %}
-                                        {{ row.scheduled_at.strftime('%d.%m.%Y %H:%M') }}
-                                    {% else %}
-                                        —
+                                        <span class="text-muted" style="font-size:.82rem;">Источники не выбраны</span>
                                     {% endif %}
                                 </td>
 
                                 {# Создан #}
-                                <td class="text-muted" style="font-size:.85rem;">
-                                    {{ row.post_created.strftime('%d.%m.%Y %H:%M') }}
+                                <td class="text-muted align-top" style="font-size:.82rem;padding-top:.85rem;">
+                                    {{ post.post_created.strftime('%d.%m.%Y') }}<br>
+                                    <span style="font-size:.75rem;">{{ post.post_created.strftime('%H:%M') }}</span>
                                 </td>
 
-                                {# Действия #}
-                                <td>
-                                    <div class="d-flex gap-1 justify-content-end">
-                                        {% if row.channel_id %}
-                                        <a href="/admin/posts/wizard?post_id={{ row.post_id }}&step=3&channel_id={{ row.channel_id }}&from_list=1"
-                                           class="row-action-btn row-action-btn--row_action_2_edit"
-                                           title="Редактировать источник">
-                                            <i class="fa-solid fa-pen-to-square"></i>
-                                        </a>
-                                        {% else %}
-                                        <a href="/admin/posts/wizard?post_id={{ row.post_id }}&step=1"
-                                           class="row-action-btn row-action-btn--row_action_2_edit"
-                                           title="Редактировать пост">
-                                            <i class="fa-solid fa-pen-to-square"></i>
-                                        </a>
-                                        {% endif %}
-                                        {% if row.channel_id %}
-                                        <button type="button"
-                                                class="row-action-btn btn-republish"
-                                                style="color:#6366f1;"
-                                                data-post-id="{{ row.post_id }}"
-                                                data-channel-id="{{ row.channel_id }}"
-                                                data-source-name="{{ row.source_name }}"
-                                                data-post-title="{{ row.post_title }}"
-                                                title="Перепубликовать">
-                                            <i class="fa-solid fa-rotate-right"></i>
-                                        </button>
-                                        {% endif %}
-                                        {% if row.channel_id %}
-                                        <button type="button"
-                                                class="row-action-btn row-action-btn--row_action_3_delete btn-delete"
-                                                data-channel-id="{{ row.channel_id }}"
-                                                data-source-name="{{ row.source_name }}"
-                                                data-post-title="{{ row.post_title }}"
-                                                title="Удалить источник">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                        {% else %}
-                                        <button type="button"
-                                                class="row-action-btn row-action-btn--row_action_3_delete btn-delete"
-                                                data-post-id="{{ row.post_id }}"
-                                                data-post-title="{{ row.post_title }}"
-                                                title="Удалить пост">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                        {% endif %}
-                                    </div>
+                                {# Действия поста #}
+                                <td class="align-top" style="padding-top:.7rem;">
+                                    <button type="button" class="ch-btn btn-delete"
+                                            data-post-id="{{ post.post_id }}"
+                                            data-post-title="{{ post.post_title }}"
+                                            title="Удалить пост">
+                                        <i class="fa-solid fa-trash" style="color:#ef4444;"></i>
+                                    </button>
                                 </td>
                             </tr>
                             {% endfor %}
                         {% else %}
                             <tr class="no-hover">
-                                <td colspan="7" class="text-center py-5">
+                                <td colspan="5" class="text-center py-5">
                                     {% if search %}
                                         <i class="fa-solid fa-magnifying-glass" style="font-size:2rem;color:#94a3b8;display:block;margin-bottom:.75rem;"></i>
                                         <div class="text-muted fw-medium">Ничего не найдено</div>
@@ -206,18 +191,32 @@
                     </table>
                 </div>
 
-                {# ── Футер: счётчик + пагинация ─────────────────────────────── #}
+                {# ── Футер: счётчик + селектор размера + пагинация ──────────── #}
                 {% if total_pages > 1 or rows %}
-                <div class="card-footer d-flex align-items-center">
+                {%- set pp = "&per_page=" ~ per_page if per_page != 20 else "" -%}
+                <div class="card-footer d-flex align-items-center gap-3 flex-wrap">
                     <p class="m-0 text-muted" style="font-size:.8rem;">
                         Постов: {{ total_posts }}
                     </p>
+
+                    {# Селектор количества постов на странице #}
+                    <div class="d-flex align-items-center gap-2 ms-2" style="font-size:.8rem;">
+                        <label class="text-muted mb-0" for="per-page-select">Постов на странице:</label>
+                        <select id="per-page-select" class="form-select form-select-sm"
+                                style="width:70px;"
+                                onchange="window.location.href='{{ list_url }}?page=1&per_page='+this.value+'{% if search %}&q={{ search }}{% endif %}'">
+                            {% for opt in per_page_options %}
+                            <option value="{{ opt }}" {% if opt == per_page %}selected{% endif %}>{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
                     {% if total_pages > 1 %}
                     <nav class="ms-auto">
                         <ul class="pagination pagination-sm m-0 gap-1">
                             {% if page > 1 %}
                                 <li class="page-item">
-                                    <a class="pag-btn" href="{{ list_url }}?page={{ page - 1 }}{% if search %}&q={{ search }}{% endif %}">‹</a>
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ page - 1 }}{{ pp }}{% if search %}&q={{ search }}{% endif %}">‹</a>
                                 </li>
                             {% endif %}
 
@@ -227,7 +226,7 @@
 
                             {% if win_start > 1 %}
                                 <li class="page-item">
-                                    <a class="pag-btn" href="{{ list_url }}?page=1{% if search %}&q={{ search }}{% endif %}">1</a>
+                                    <a class="pag-btn" href="{{ list_url }}?page=1{{ pp }}{% if search %}&q={{ search }}{% endif %}">1</a>
                                 </li>
                                 {% if win_start > 2 %}<li class="page-item disabled"><span class="pag-sep">···</span></li>{% endif %}
                             {% endif %}
@@ -235,20 +234,20 @@
                             {% for p in range(win_start, win_end + 1) %}
                                 <li class="page-item">
                                     <a class="pag-btn {% if p == page %}pag-btn--active{% endif %}"
-                                       href="{{ list_url }}?page={{ p }}{% if search %}&q={{ search }}{% endif %}">{{ p }}</a>
+                                       href="{{ list_url }}?page={{ p }}{{ pp }}{% if search %}&q={{ search }}{% endif %}">{{ p }}</a>
                                 </li>
                             {% endfor %}
 
                             {% if win_end < total_pages %}
                                 {% if win_end < total_pages - 1 %}<li class="page-item disabled"><span class="pag-sep">···</span></li>{% endif %}
                                 <li class="page-item">
-                                    <a class="pag-btn" href="{{ list_url }}?page={{ total_pages }}{% if search %}&q={{ search }}{% endif %}">{{ total_pages }}</a>
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ total_pages }}{{ pp }}{% if search %}&q={{ search }}{% endif %}">{{ total_pages }}</a>
                                 </li>
                             {% endif %}
 
                             {% if page < total_pages %}
                                 <li class="page-item">
-                                    <a class="pag-btn" href="{{ list_url }}?page={{ page + 1 }}{% if search %}&q={{ search }}{% endif %}">›</a>
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ page + 1 }}{{ pp }}{% if search %}&q={{ search }}{% endif %}">›</a>
                                 </li>
                             {% endif %}
                         </ul>
@@ -311,54 +310,77 @@
     .status-badge {
         display: inline-flex;
         align-items: center;
-        gap: .35rem;
+        gap: .3rem;
         padding: .2rem .6rem;
         border-radius: 20px;
         font-size: .775rem;
         font-weight: 500;
         white-space: nowrap;
     }
+    .status-badge--sm { padding: .1rem .45rem; font-size: .72rem; }
+
+    /* ── Пагинация ── */
     .pag-btn {
-        min-width: 32px;
-        height: 32px;
-        padding: 0 .55rem;
-        border-radius: 7px;
-        border: 1px solid #e2e8f0;
-        background: #fff;
-        color: #475569;
-        font-size: .82rem;
-        font-weight: 500;
-        cursor: pointer;
-        line-height: 32px;
-        display: inline-block;
-        text-align: center;
-        text-decoration: none;
+        min-width: 32px; height: 32px; padding: 0 .55rem;
+        border-radius: 7px; border: 1px solid #e2e8f0;
+        background: #fff; color: #475569;
+        font-size: .82rem; font-weight: 500; cursor: pointer;
+        line-height: 32px; display: inline-block;
+        text-align: center; text-decoration: none;
         transition: background .12s, border-color .12s, color .12s;
         white-space: nowrap;
     }
     .pag-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #1e293b; }
-    .pag-btn.pag-btn--active {
-        background: #6366f1;
-        border-color: #6366f1;
-        color: #fff;
-        pointer-events: none;
-    }
+    .pag-btn.pag-btn--active { background: #6366f1; border-color: #6366f1; color: #fff; pointer-events: none; }
     .pag-sep { color: #cbd5e1; font-size: .85rem; padding: 0 .2rem; }
-    table tbody tr:not(.no-hover) { cursor: pointer; }
+
+    /* ── Строка поста ── */
+    table tbody tr.post-row { cursor: default; }
     table tbody tr.no-hover:hover > td { background: transparent !important; }
-    .row-action-btn--row_action_3_delete { color: #ef4444 !important; }
-    .btn-republish,
-    .btn-delete {
-        background: none;
-        border: none;
-        padding: 0 .25rem;
-        line-height: 1;
+    .post-title-link:hover { color: #6366f1 !important; }
+
+    /* ── Список каналов внутри строки ── */
+    .ch-list { display: flex; flex-direction: column; gap: .3rem; }
+
+    .ch-item {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .3rem .55rem;
+        border-radius: 7px;
+        background: #f8fafc;
+        font-size: .82rem;
+        min-width: 0;
     }
-    .btn-republish:focus,
-    .btn-delete:focus {
-        outline: none;
-        box-shadow: none;
+    .ch-item:hover { background: #f1f5f9; }
+    .ch-item:hover .ch-actions { opacity: 1; }
+
+    .ch-platform-icon { font-size: .9rem; flex-shrink: 0; }
+    .ch-icon--tg  { color: #0088cc; }
+    .ch-icon--vk  { color: #4680c2; }
+    .ch-icon--max { color: #5b5ea6; }
+
+    .ch-src-name {
+        font-weight: 500; color: #334155;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        max-width: 160px; flex-shrink: 0;
     }
+
+    .ch-date { color: #94a3b8; font-size: .76rem; white-space: nowrap; flex-shrink: 0; margin-left: auto; }
+
+    .ch-actions {
+        display: flex; gap: .1rem; flex-shrink: 0;
+        opacity: 0; transition: opacity .15s;
+        margin-left: .25rem;
+    }
+    .ch-btn {
+        background: none; border: none; padding: .15rem .3rem;
+        border-radius: 5px; cursor: pointer; color: #64748b;
+        font-size: .85rem; line-height: 1;
+        transition: background .1s, color .1s;
+    }
+    .ch-btn:hover { background: #e2e8f0; }
+    .ch-btn:focus { outline: none; box-shadow: none; }
 </style>
 {% endblock %}
 
@@ -368,15 +390,6 @@
 (function () {
     // Тултипы для бейджей FAILED
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
-
-    // Клик по строке → редактирование (через ссылку карандаша в той же строке)
-    document.querySelectorAll('tbody tr').forEach(tr => {
-        tr.addEventListener('click', function (e) {
-            if (e.target.closest('button, a')) return;
-            const editBtn = this.querySelector('.row-action-btn--row_action_2_edit');
-            if (editBtn) window.location.href = editBtn.getAttribute('href');
-        });
-    });
 
     // ── Перепубликация ────────────────────────────────────────────────────────
     (function () {
@@ -494,7 +507,7 @@
         });
     })();
 
-    // Кнопка удаления
+    // Кнопка удаления (каналы и посты)
     document.querySelectorAll('.btn-delete').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
@@ -502,15 +515,10 @@
             const postId     = this.dataset.postId;
             const postTitle  = this.dataset.postTitle;
             const sourceName = this.dataset.sourceName;
-
-            let msg;
-            if (channelId) {
-                msg = `Удалить источник «${sourceName}» из поста «${postTitle}»?`;
-            } else {
-                msg = `Удалить пост «${postTitle}»?`;
-            }
+            const msg = channelId
+                ? `Удалить источник «${sourceName}» из поста «${postTitle}»?`
+                : `Удалить пост «${postTitle}»?`;
             if (!confirm(msg)) return;
-
             document.getElementById('delete-channel-id').value = channelId || '';
             document.getElementById('delete-post-id').value    = postId    || '';
             document.getElementById('delete-form').submit();

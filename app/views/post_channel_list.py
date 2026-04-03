@@ -10,8 +10,9 @@ from app.database import SessionLocal
 from app.models import TelegramSource, VKSource, MAXSource
 from app.models.post import Post, PostChannel
 
-_LIST_URL = "/admin/posts"
-_PER_PAGE = 20
+_LIST_URL        = "/admin/posts"
+_PER_PAGE_DEFAULT = 20
+_PER_PAGE_OPTIONS = (5, 10, 20, 50, 100)
 
 _SOURCE_ICONS = {
     "telegram": "fa-brands fa-telegram",
@@ -64,8 +65,14 @@ class PostChannelListView(CustomView):
     # ── List ──────────────────────────────────────────────────────────────────
 
     def _render_list(self, request: Request, templates: Jinja2Templates) -> Response:
-        page   = max(1, int(request.query_params.get("page", 1)))
-        search = request.query_params.get("q", "").strip()
+        page     = max(1, int(request.query_params.get("page", 1)))
+        search   = request.query_params.get("q", "").strip()
+        try:
+            per_page = int(request.query_params.get("per_page", _PER_PAGE_DEFAULT))
+        except ValueError:
+            per_page = _PER_PAGE_DEFAULT
+        if per_page not in _PER_PAGE_OPTIONS:
+            per_page = _PER_PAGE_DEFAULT
 
         with SessionLocal() as db:
             # Предзагружаем все источники для быстрого поиска по имени
@@ -78,63 +85,56 @@ class PostChannelListView(CustomView):
                 q = q.filter(Post.title.ilike(f"%{search}%"))
 
             total_posts = q.count()
-            posts = q.offset((page - 1) * _PER_PAGE).limit(_PER_PAGE).all()
+            posts = q.offset((page - 1) * per_page).limit(per_page).all()
 
-            rows = []
-            for post in posts:
-                if post.channels:
-                    for ch in post.channels:
-                        rows.append(_build_row(post, ch, tg, vk, mx))
-                else:
-                    rows.append(_build_row(post, None, tg, vk, mx))
+            post_rows = [_build_post_row(p, tg, vk, mx) for p in posts]
 
-        # Для пагинации считаем по постам, а не по строкам
-        total_pages = max(1, ceil(total_posts / _PER_PAGE))
-        failed_count = sum(1 for r in rows if r["ch_status"] == "failed")
+        total_pages  = max(1, ceil(total_posts / per_page))
+        failed_count = sum(1 for p in post_rows if p["has_failed"])
 
         return templates.TemplateResponse(
             request=request,
             name="posts/channel_list.html",
             context={
-                "rows":         rows,
-                "page":         page,
-                "total_pages":  total_pages,
-                "total_posts":  total_posts,
-                "search":       search,
-                "list_url":     _LIST_URL,
-                "failed_count": failed_count,
+                "post_rows":        post_rows,
+                "page":             page,
+                "per_page":         per_page,
+                "per_page_options": _PER_PAGE_OPTIONS,
+                "total_pages":      total_pages,
+                "total_posts":      total_posts,
+                "search":           search,
+                "list_url":         _LIST_URL,
+                "failed_count":     failed_count,
             },
         )
 
 
-def _build_row(post: Post, channel: PostChannel | None,
-               tg: dict, vk: dict, mx: dict) -> dict:
-    source_name = source_icon = source_label = None
-    if channel:
-        t = channel.source_type
-        source_icon  = _SOURCE_ICONS.get(t, "fa-solid fa-circle")
-        source_label = _SOURCE_LABELS.get(t, t)
-        if t == "telegram":
-            src = tg.get(channel.source_id)
-        elif t == "vk":
-            src = vk.get(channel.source_id)
-        else:
-            src = mx.get(channel.source_id)
-        source_name = src.name if src else f"#{channel.source_id}"
-
+def _build_post_row(post: Post, tg: dict, vk: dict, mx: dict) -> dict:
+    channels = []
+    has_failed = False
+    for ch in post.channels:
+        t   = ch.source_type
+        src = (tg if t == "telegram" else vk if t == "vk" else mx).get(ch.source_id)
+        if ch.status.value == "failed":
+            has_failed = True
+        channels.append({
+            "channel_id":   ch.id,
+            "ch_title":     ch.title or post.title,
+            "source_type":  t,
+            "source_icon":  _SOURCE_ICONS.get(t, "fa-solid fa-circle"),
+            "source_label": _SOURCE_LABELS.get(t, t),
+            "source_name":  src.name if src else f"#{ch.source_id}",
+            "ch_status":    ch.status.value,
+            "scheduled_at": ch.scheduled_at,
+            "published_at": ch.published_at,
+            "error_msg":    ch.error_message,
+        })
     return {
-        "post_id":       post.id,
-        "post_title":    (channel.title or post.title) if channel else post.title,
-        "post_tags":     post.tags,
-        "post_status":   post.status.value,
-        "post_created":  post.created_at,
-        "channel_id":    channel.id if channel else None,
-        "source_type":   channel.source_type if channel else None,
-        "source_icon":   source_icon,
-        "source_label":  source_label,
-        "source_name":   source_name,
-        "ch_status":     channel.status.value if channel else None,
-        "scheduled_at":  channel.scheduled_at if channel else None,
-        "published_at":  channel.published_at if channel else None,
-        "error_msg":     channel.error_message if channel else None,
+        "post_id":      post.id,
+        "post_title":   post.title,
+        "post_tags":    post.tags,
+        "post_status":  post.status.value,
+        "post_created": post.created_at,
+        "has_failed":   has_failed,
+        "channels":     channels,
     }
