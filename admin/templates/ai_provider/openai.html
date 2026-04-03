@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_markdown_editor.html" import markdown_editor %}
 
 {% block header %}
 <div class="d-flex justify-content-between align-items-center">
@@ -72,11 +73,15 @@
                         {# Base Prompt #}
                         <div class="mb-3">
                             <label class="form-label">Базовый промпт <span class="text-muted">(необязательно)</span></label>
-                            <textarea name="base_prompt" class="form-control" rows="5"
-                                      placeholder="Системные инструкции, применяемые ко всем запросам генерации…">{{ form.base_prompt if form.base_prompt is defined else (provider.base_prompt or '' if editing else '') }}</textarea>
+                            {{ markdown_editor(
+                                "base_prompt",
+                                value=form.base_prompt if form.base_prompt is defined else (provider.base_prompt or '' if editing else ''),
+                                rows=5,
+                                placeholder="Системные инструкции, применяемые ко всем запросам генерации…"
+                            ) }}
                             <small class="form-hint">
                                 Глобальные правила для AI: стиль, язык, ограничения.
-                                Prepend-ится перед промптом источника и кастомным промптом пользователя.
+                                Включается перед промптом источника и кастомным промптом пользователя.
                                 Оставьте пустым, чтобы не использовать глобальные инструкции.
                             </small>
                         </div>

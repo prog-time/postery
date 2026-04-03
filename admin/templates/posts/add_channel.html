@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 {% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
+{% from "_markdown_editor.html" import markdown_editor %}
 
 {% block header %}
 <div class="d-flex justify-content-between align-items-center">
@@ -102,8 +103,11 @@
                                 Текст
                                 {{ ai_btn("description") }}
                             </label>
-                            <textarea name="description" class="form-control" rows="6"
-                                      >{{ form_description if form_description is defined else (post.description or '') }}</textarea>
+                            {{ markdown_editor(
+                                "description",
+                                value=form_description if form_description is defined else (post.description or ''),
+                                rows=6
+                            ) }}
                         </div>
 
                         <div class="mb-0">

@@ -1,0 +1,132 @@
+{#
+  Jinja2-макрос: Markdown-редактор с вкладками «Редактировать» / «Предпросмотр».
+
+  Использование:
+    {% from "_markdown_editor.html" import markdown_editor %}
+    {{ markdown_editor("field_name", value, rows=10) }}
+
+  Параметры:
+    field_name  — атрибут name для <textarea> (обязательный)
+    value       — текущее значение поля (строка)
+    rows        — количество строк textarea (по умолчанию 10)
+    placeholder — подсказка внутри textarea (необязательный)
+    extra_class — дополнительные CSS-классы для textarea (необязательный)
+
+  Зависимости:
+    - marked.js загружается один раз через CDN при первом вызове макроса на странице
+    - Bootstrap/Tabler (nav-tabs, card, btn) уже подключён в layout.html
+#}
+
+{% macro markdown_editor(field_name, value="", rows=10, placeholder="", extra_class="") %}
+{% set editor_id = "md-editor-" ~ field_name | replace("_", "-") %}
+{% set preview_id = "md-preview-" ~ field_name | replace("_", "-") %}
+{% set tab_write_id = "tab-write-" ~ field_name | replace("_", "-") %}
+{% set tab_preview_id = "tab-preview-" ~ field_name | replace("_", "-") %}
+
+{# Загружаем marked.js один раз на страницу #}
+<script>
+if (!window.__markedLoaded) {
+    window.__markedLoaded = true;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+    s.async = false;
+    document.head.appendChild(s);
+}
+</script>
+
+<div class="markdown-editor-wrapper" data-field="{{ field_name }}">
+    {# Вкладки #}
+    <ul class="nav nav-tabs mb-0" style="border-bottom:none;">
+        <li class="nav-item">
+            <button type="button"
+                    class="nav-link active py-1 px-3"
+                    id="{{ tab_write_id }}"
+                    data-target="write"
+                    data-editor="{{ editor_id }}"
+                    data-preview="{{ preview_id }}"
+                    style="font-size:.85rem;">
+                <i class="fa fa-pen me-1" style="font-size:.75rem;"></i>Редактировать
+            </button>
+        </li>
+        <li class="nav-item">
+            <button type="button"
+                    class="nav-link py-1 px-3"
+                    id="{{ tab_preview_id }}"
+                    data-target="preview"
+                    data-editor="{{ editor_id }}"
+                    data-preview="{{ preview_id }}"
+                    style="font-size:.85rem;">
+                <i class="fa fa-eye me-1" style="font-size:.75rem;"></i>Предпросмотр
+            </button>
+        </li>
+    </ul>
+
+    {# Редактор #}
+    <textarea id="{{ editor_id }}"
+              name="{{ field_name }}"
+              class="form-control {{ extra_class }}"
+              rows="{{ rows }}"
+              placeholder="{{ placeholder }}"
+              style="border-top-left-radius:0;border-top-right-radius:0;resize:vertical;"
+              >{{ value }}</textarea>
+
+    {# Область предпросмотра #}
+    <div id="{{ preview_id }}"
+         class="markdown-preview border rounded p-3 bg-white"
+         style="display:none;min-height:{{ rows * 1.6 | round | int }}rem;
+                border-top-left-radius:0;border-top-right-radius:0;
+                font-size:.9rem;line-height:1.6;overflow-y:auto;">
+    </div>
+</div>
+
+<script>
+(function () {
+    var tabWriteId   = {{ tab_write_id | tojson }};
+    var tabPreviewId = {{ tab_preview_id | tojson }};
+    var editorId     = {{ editor_id | tojson }};
+    var previewId    = {{ preview_id | tojson }};
+
+    function renderPreview() {
+        var textarea = document.getElementById(editorId);
+        var preview  = document.getElementById(previewId);
+        if (!textarea || !preview) return;
+        var text = textarea.value;
+        if (typeof marked === 'undefined' || !marked.parse) {
+            preview.innerHTML = '<em class="text-muted">Загрузка парсера…</em>';
+            setTimeout(renderPreview, 150);
+            return;
+        }
+        preview.innerHTML = marked.parse(text);
+    }
+
+    function initTabs() {
+        var tabWrite   = document.getElementById(tabWriteId);
+        var tabPreview = document.getElementById(tabPreviewId);
+        var textarea   = document.getElementById(editorId);
+        var preview    = document.getElementById(previewId);
+        if (!tabWrite || !tabPreview || !textarea || !preview) return;
+
+        tabWrite.addEventListener('click', function () {
+            tabWrite.classList.add('active');
+            tabPreview.classList.remove('active');
+            textarea.style.display = '';
+            preview.style.display  = 'none';
+        });
+
+        tabPreview.addEventListener('click', function () {
+            tabPreview.classList.add('active');
+            tabWrite.classList.remove('active');
+            textarea.style.display = 'none';
+            preview.style.display  = '';
+            renderPreview();
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTabs);
+    } else {
+        initTabs();
+    }
+})();
+</script>
+{% endmacro %}
