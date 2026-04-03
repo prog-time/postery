@@ -21,6 +21,7 @@ from app.models import TelegramSource, VKSource, MAXSource, AdminUser, Role
 from app.models import Post, PostChannel, PostStatus, ChannelStatus
 from app.models.providers import AIProvider, ProviderType
 from app.auth import RoleAuthProvider, SuperadminOnly, EditorAccessMixin
+from app.views.add_channel import AddChannelView
 from app.views.posts import PostWizardView
 from app.views.post_channel_list import PostChannelListView
 from app.views.calendar import CalendarView
@@ -370,6 +371,7 @@ def create_admin() -> Admin:
     # Посты
     admin.add_view(PostChannelListView(label="Все посты", icon="fa-solid fa-newspaper"))
     admin.add_view(PostWizardView(label="Создать пост", add_to_menu=False))
+    admin.add_view(AddChannelView(label="Добавить источник к посту", add_to_menu=False))
     admin.add_view(CalendarView(label="Календарь", icon="fa-solid fa-calendar-days"))
 
     # Источники

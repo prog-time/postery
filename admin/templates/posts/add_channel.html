@@ -1,0 +1,181 @@
+{% extends "layout.html" %}
+{% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
+
+{% block header %}
+<div class="d-flex justify-content-between align-items-center">
+    <h1>Добавить источник</h1>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for(__name__ ~ ':index') }}">Админ</a></li>
+        <li class="breadcrumb-item"><a href="/admin/posts">Все посты</a></li>
+        <li class="breadcrumb-item active">{{ post.title }}</li>
+    </ol>
+</div>
+{% endblock %}
+
+{% block content %}
+{# Контекст источника для AI-генерации (обновляется JS при смене источника) #}
+<div id="ai-generate-ctx" hidden
+     data-source-type=""
+     data-source-id=""></div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-lg-7">
+
+            {% if error %}
+            <div class="alert alert-danger mb-3">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" action="?post_id={{ post.id }}">
+                <input type="hidden" name="post_id" value="{{ post.id }}">
+
+                <div class="card">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <i id="source-icon" class="fa-solid fa-satellite-dish" style="font-size:1.1rem;color:#94a3b8;"></i>
+                        <div>
+                            <h3 id="source-title" class="card-title mb-0" style="color:#94a3b8;font-style:italic;">Выберите источник</h3>
+                        </div>
+                    </div>
+
+                    <div class="card-body border-bottom py-3">
+
+                        <div class="mb-3">
+                            <label class="form-label">Источник публикации</label>
+                            <select class="form-select" name="source" id="source-select" required>
+                                <option value="">— выберите —</option>
+
+                                {% if tg_sources %}
+                                <optgroup label="Telegram">
+                                    {% for s in tg_sources %}
+                                    <option value="telegram:{{ s.id }}"
+                                            data-type="telegram"
+                                            data-name="{{ s.name }}"
+                                            data-source-id="{{ s.id }}"
+                                            {% if selected_source == 'telegram:' ~ s.id|string %}selected{% endif %}>
+                                        {{ s.name }}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+
+                                {% if vk_sources %}
+                                <optgroup label="ВКонтакте">
+                                    {% for s in vk_sources %}
+                                    <option value="vk:{{ s.id }}"
+                                            data-type="vk"
+                                            data-name="{{ s.name }}"
+                                            data-source-id="{{ s.id }}"
+                                            {% if selected_source == 'vk:' ~ s.id|string %}selected{% endif %}>
+                                        {{ s.name }}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+
+                                {% if mx_sources %}
+                                <optgroup label="MAX">
+                                    {% for s in mx_sources %}
+                                    <option value="max:{{ s.id }}"
+                                            data-type="max"
+                                            data-name="{{ s.name }}"
+                                            data-source-id="{{ s.id }}"
+                                            {% if selected_source == 'max:' ~ s.id|string %}selected{% endif %}>
+                                        {{ s.name }}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label d-flex align-items-center">
+                                Заголовок
+                                {{ ai_btn("title") }}
+                            </label>
+                            <input type="text" name="title" class="form-control"
+                                   value="{{ form_title if form_title is defined else post.title }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label d-flex align-items-center">
+                                Текст
+                                {{ ai_btn("description") }}
+                            </label>
+                            <textarea name="description" class="form-control" rows="6"
+                                      >{{ form_description if form_description is defined else (post.description or '') }}</textarea>
+                        </div>
+
+                        <div class="mb-0">
+                            <label class="form-label">Дата и время публикации</label>
+                            <input type="datetime-local" name="scheduled_at" class="form-control"
+                                   value="{{ form_scheduled_at if form_scheduled_at is defined else '' }}">
+                            <small class="form-hint">Оставьте пустым — публикация сразу, как только пост попадёт в очередь</small>
+                        </div>
+
+                    </div>
+
+                    <div class="card-footer">
+                        <div class="btn-list ms-auto justify-content-end">
+                            <a href="/admin/posts" class="btn btn-danger">Отмена</a>
+                            <button type="submit" class="btn btn-success">Добавить</button>
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+{{ ai_modals() }}
+{% endblock %}
+
+{% block script %}
+{{ super() }}
+{{ ai_script() }}
+<script>
+(function () {
+    const ICONS = {
+        telegram: 'fa-brands fa-telegram',
+        vk:       'fa-brands fa-vk',
+        max:      'fa-solid fa-message',
+    };
+    const COLORS = {
+        telegram: '#0088cc',
+        vk:       '#4680c2',
+        max:      '#5b5ea6',
+    };
+
+    const sel    = document.getElementById('source-select');
+    const icon   = document.getElementById('source-icon');
+    const title  = document.getElementById('source-title');
+    const ctxEl  = document.getElementById('ai-generate-ctx');
+
+    function updateHeader() {
+        const opt = sel.options[sel.selectedIndex];
+        const t   = opt ? opt.dataset.type : null;
+        if (t && ICONS[t]) {
+            icon.className       = ICONS[t];
+            icon.style.color     = COLORS[t];
+            title.textContent    = opt.dataset.name || opt.text;
+            title.style.color    = '#1e293b';
+            title.style.fontStyle = 'normal';
+        } else {
+            icon.className       = 'fa-solid fa-satellite-dish';
+            icon.style.color     = '#94a3b8';
+            title.textContent    = 'Выберите источник';
+            title.style.color    = '#94a3b8';
+            title.style.fontStyle = 'italic';
+        }
+        if (ctxEl && opt) {
+            ctxEl.dataset.sourceType = opt.dataset.type || '';
+            ctxEl.dataset.sourceId   = opt.dataset.sourceId || '';
+        }
+    }
+
+    sel.addEventListener('change', updateHeader);
+    updateHeader();
+})();
+</script>
+{% endblock %}
