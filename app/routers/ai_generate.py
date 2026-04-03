@@ -1,6 +1,8 @@
+import hashlib
 import logging
 import uuid
 import warnings
+from datetime import datetime, timedelta
 
 import httpx
 from fastapi import APIRouter, Request
@@ -19,15 +21,23 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
+# In-process кэш OAuth-токена GigaChat (TTL 29 мин, сбрасывается при смене ключа)
+_gigachat_cache: dict = {
+    "token": None,
+    "expires_at": datetime.min,
+    "api_key_hash": None,
+}
+
 # Limiter берётся из app.state, куда он прикреплён в main.py (TASK-004)
 _limiter = Limiter(key_func=get_remote_address)
 
 
 class GenerateRequest(BaseModel):
     text: str
-    source_type: str   # "telegram" | "vk" | "max"
+    source_type: str        # "telegram" | "vk" | "max"
     source_id: int
-    field: str         # "title" | "description"
+    field: str              # "title" | "description"
+    prompt: str | None = None  # кастомный промпт; None → берётся из источника
 
 
 @router.post("/generate")
@@ -42,15 +52,18 @@ async def generate_text(request: Request, body: GenerateRequest):
         if not provider:
             return {"ok": False, "error": "Нет активного AI провайдера"}
 
-        source = _get_source(db, body.source_type, body.source_id)
-        if source:
-            raw_prompt = (
-                source.ai_prompt_title if body.field == "title"
-                else source.ai_prompt_description
-            )
-            ai_prompt = (raw_prompt or "").strip()
+        if body.prompt is not None and body.prompt.strip():
+            ai_prompt = body.prompt.strip()
         else:
-            ai_prompt = ""
+            source = _get_source(db, body.source_type, body.source_id)
+            if source:
+                raw_prompt = (
+                    source.ai_prompt_title if body.field == "title"
+                    else source.ai_prompt_description
+                )
+                ai_prompt = (raw_prompt or "").strip()
+            else:
+                ai_prompt = ""
 
     system_msg = ai_prompt if ai_prompt else None
     user_msg = body.text.strip()
@@ -102,8 +115,20 @@ async def _generate_openai(api_key: str, base_url: str | None, system_msg: str |
         return {"ok": False, "error": str(e)}
 
 
-async def _generate_gigachat(api_key: str, scope: str | None, system_msg: str | None, user_msg: str) -> dict:
-    # Получить OAuth токен
+async def _get_gigachat_token(api_key: str, scope: str | None) -> tuple[str | None, str | None]:
+    """Возвращает (access_token, error). Использует кэш с TTL 29 мин."""
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    now = datetime.now()
+    remaining = (_gigachat_cache["expires_at"] - now).total_seconds()
+
+    if (
+        _gigachat_cache["token"]
+        and _gigachat_cache["api_key_hash"] == key_hash
+        and remaining > 60
+    ):
+        logger.debug("GigaChat: using cached token (expires in %ds)", int(remaining))
+        return _gigachat_cache["token"], None
+
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -118,10 +143,20 @@ async def _generate_gigachat(api_key: str, scope: str | None, system_msg: str | 
                     data={"scope": scope or "GIGACHAT_API_PERS"},
                 )
         if auth_resp.status_code != 200:
-            return {"ok": False, "error": f"Ошибка авторизации GigaChat: HTTP {auth_resp.status_code}"}
-        access_token = auth_resp.json().get("access_token")
+            return None, f"Ошибка авторизации GigaChat: HTTP {auth_resp.status_code}"
+        token = auth_resp.json().get("access_token")
+        _gigachat_cache["token"] = token
+        _gigachat_cache["expires_at"] = now + timedelta(seconds=29 * 60)
+        _gigachat_cache["api_key_hash"] = key_hash
+        return token, None
     except Exception as e:
-        return {"ok": False, "error": f"Ошибка авторизации GigaChat: {e}"}
+        return None, f"Ошибка авторизации GigaChat: {e}"
+
+
+async def _generate_gigachat(api_key: str, scope: str | None, system_msg: str | None, user_msg: str) -> dict:
+    access_token, err = await _get_gigachat_token(api_key, scope)
+    if err:
+        return {"ok": False, "error": err}
 
     messages = []
     if system_msg:
