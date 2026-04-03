@@ -87,7 +87,7 @@
             <div class="card-body">
                 <div class="mb-3">
                     <label class="form-label required">Заголовок</label>
-                    <input type="text" name="title" class="form-control form-control-lg"
+                    <input type="text" name="title" class="form-control"
                            placeholder="Введите заголовок поста"
                            value="{{ post.title if post else (form.title if form else '') }}"
                            required>
@@ -95,7 +95,7 @@
 
                 <div class="mb-3">
                     <label class="form-label">Текст</label>
-                    <textarea name="description" class="form-control" rows="8"
+                    <textarea name="description" class="form-control" rows="15"
                               placeholder="Текст поста...">{{ post.description if post else (form.description if form else '') }}</textarea>
                 </div>
 
@@ -108,7 +108,6 @@
                     <div class="tag-input-wrap" id="tag-wrap">
                         <input id="tag-input" type="text" placeholder="Добавьте тег и нажмите Enter">
                     </div>
-                    <div class="form-hint">Enter или запятая — добавить тег</div>
                 </div>
             </div>
         </div>

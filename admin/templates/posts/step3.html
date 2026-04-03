@@ -28,11 +28,11 @@
     <div class="card mb-3" style="border-left: 3px solid #6366f1;">
         <div class="card-body py-3 d-flex align-items-center gap-3">
             {% if channel.source_type == "telegram" %}
-                <i class="fa-brands fa-telegram fa-lg" style="color:#0088cc;"></i>
+                <i class="fa-brands fa-telegram fa-2xl" style="color:#0088cc;"></i>
             {% elif channel.source_type == "vk" %}
-                <i class="fa-brands fa-vk fa-lg" style="color:#4680c2;"></i>
+                <i class="fa-brands fa-vk fa-2xl" style="color:#4680c2;"></i>
             {% elif channel.source_type == "max" %}
-                <i class="fa-solid fa-message fa-lg" style="color:#5b5ea6;"></i>
+                <i class="fa-solid fa-message fa-2xl" style="color:#5b5ea6;"></i>
             {% else %}
                 <i class="fa fa-share-nodes fa-lg text-muted"></i>
             {% endif %}
@@ -46,8 +46,19 @@
         </div>
     </div>
 
-    <form method="POST"
-          action="{{ wizard_url }}?post_id={{ post.id }}&step=3&channel_id={{ channel.id }}">
+    <form method="POST" action="{{ wizard_url }}?post_id={{ post.id }}&step=3&channel_id={{ channel.id }}">
+
+        {# Оригинал для справки #}
+        <div class="mb-4 p-3 rounded-2 bg-light border">
+            <div class="text-muted small fw-semibold mb-1 text-uppercase" style="letter-spacing:.05em;">
+                <i class="fa fa-file-lines me-1"></i>Оригинал
+            </div>
+            <div class="fw-semibold">{{ post.title }}</div>
+            {% if post.description %}
+            <div class="text-muted small mt-1"
+                 style="white-space:pre-wrap;max-height:80px;overflow:hidden;">{{ post.description[:250] }}{% if post.description|length > 250 %}…{% endif %}</div>
+            {% endif %}
+        </div>
 
         <div class="card mb-4">
             <div class="card-header d-flex align-items-center justify-content-between">
@@ -57,19 +68,6 @@
                 </span>
             </div>
             <div class="card-body">
-
-                {# Оригинал для справки #}
-                <div class="mb-4 p-3 rounded-2 bg-light border">
-                    <div class="text-muted small fw-semibold mb-1 text-uppercase" style="letter-spacing:.05em;">
-                        <i class="fa fa-file-lines me-1"></i>Оригинал
-                    </div>
-                    <div class="fw-semibold">{{ post.title }}</div>
-                    {% if post.description %}
-                    <div class="text-muted small mt-1"
-                         style="white-space:pre-wrap;max-height:80px;overflow:hidden;">{{ post.description[:250] }}{% if post.description|length > 250 %}…{% endif %}</div>
-                    {% endif %}
-                </div>
-
                 <div class="mb-3">
                     <label class="form-label d-flex align-items-center">
                         Заголовок
@@ -83,7 +81,7 @@
                         Текст
                         {{ ai_btn("description") }}
                     </label>
-                    <textarea name="description" class="form-control" rows="7"
+                    <textarea name="description" class="form-control" rows="15"
                               >{{ channel.description or post.description or '' }}</textarea>
                 </div>
 
