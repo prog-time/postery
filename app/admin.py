@@ -368,7 +368,7 @@ def create_admin() -> Admin:
         ],
     )
 
-    # Посты
+    # Публикации
     admin.add_view(PostChannelListView(label="Все посты", icon="fa-solid fa-newspaper"))
     admin.add_view(PostWizardView(label="Создать пост", add_to_menu=False))
     admin.add_view(AddChannelView(label="Добавить источник к посту", add_to_menu=False))
