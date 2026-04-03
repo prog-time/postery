@@ -39,7 +39,7 @@
                     </div>
                     <div class="d-flex gap-2 mt-3 text-muted small">
                         <span><i class="fa-solid fa-pencil me-1 text-secondary"></i>Черновики: <strong>{{ posts_draft }}</strong></span>
-                        <span class="ms-auto"><i class="fa-solid fa-clock me-1 text-warning"></i>Готовы: <strong>{{ posts_ready }}</strong></span>
+                        <span class="ms-auto"><i class="fa-solid fa-clock me-1 text-warning"></i>В очереди: <strong>{{ posts_ready }}</strong></span>
                     </div>
                 </div>
             </div>
@@ -84,7 +84,7 @@
         </div>
 
         <div class="col-sm-6 col-lg-3">
-            <div class="card {% if ch_failed > 0 %}border-danger{% endif %}">
+            <div class="card">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <span class="me-3" style="width:44px;height:44px;border-radius:10px;background:rgba(214,57,57,.12);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#d63939;">
@@ -175,7 +175,7 @@
                         <i class="fa-solid fa-message mt-1 me-2" style="color:#5b5ea6;width:16px;"></i>
                         {% endif %}
                         <div class="flex-fill overflow-hidden">
-                            <div class="text-body text-truncate small fw-medium">{{ ch.effective_title }}</div>
+                            <div class="text-body text-truncate small fw-medium">{{ ch.title }}</div>
                             <div class="text-muted" style="font-size:.75rem;">
                                 {{ ch.published_at.strftime('%d.%m %H:%M') if ch.published_at else '—' }}
                             </div>
@@ -210,7 +210,7 @@
                         <i class="fa-solid fa-message mt-1 me-2" style="color:#5b5ea6;width:16px;"></i>
                         {% endif %}
                         <div class="flex-fill overflow-hidden">
-                            <div class="text-body text-truncate small fw-medium">{{ ch.effective_title }}</div>
+                            <div class="text-body text-truncate small fw-medium">{{ ch.title }}</div>
                             <div class="text-danger text-truncate" style="font-size:.75rem;">
                                 {{ ch.error_message or 'Неизвестная ошибка' }}
                             </div>
