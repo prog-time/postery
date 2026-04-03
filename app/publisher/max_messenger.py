@@ -46,9 +46,9 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
 
     except httpx.HTTPStatusError as e:
         return False, f"HTTP {e.response.status_code}: {e.response.text[:500]}"
-    except Exception:
-        import traceback
-        return False, traceback.format_exc(limit=5)
+    except Exception as e:
+        log.exception("MAX publish failed")
+        return False, str(e)[:500]
 
 
 async def _upload_image(client: httpx.AsyncClient, token: str, path: str) -> dict | None:

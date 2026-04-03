@@ -59,8 +59,8 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
     except httpx.HTTPStatusError as e:
         return False, f"HTTP {e.response.status_code}: {e.response.text[:500]}"
     except Exception as e:
-        import traceback
-        return False, traceback.format_exc(limit=5)
+        log.exception("VK publish failed")
+        return False, str(e)[:500]
 
 
 def _vk_check(data: dict, method: str):
