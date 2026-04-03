@@ -83,6 +83,14 @@ async def generate_text(request: Request, body: GenerateRequest):
     if not user_msg:
         return {"ok": False, "error": "Поле пустое — нечего обрабатывать"}
 
+    logger.debug(
+        "AI generate request — provider=%s field=%s\nsystem_msg=%r\nuser_msg=%r",
+        provider.provider_type,
+        body.field,
+        system_msg,
+        user_msg,
+    )
+
     if provider.provider_type == ProviderType.OPENAI:
         return await _generate_openai(provider.api_key, provider.base_url, system_msg, user_msg)
     if provider.provider_type == ProviderType.GIGACHAT:
