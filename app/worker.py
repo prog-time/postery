@@ -8,6 +8,8 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
+from sqlalchemy import or_
+
 from app.config import BASE_DIR, MAX_ATTEMPTS, RETRY_DELAY_MINUTES
 from app.database import SessionLocal
 from app.models.post import PostChannel, ChannelStatus, PostStatus
@@ -37,17 +39,15 @@ async def _process_due_channels():
     now = datetime.now()  # naive local — совпадает с тем, что хранит datetime-local input
 
     with SessionLocal() as db:
-        pending = (
+        due = (
             db.query(PostChannel)
-            .filter(PostChannel.status == ChannelStatus.PENDING)
+            .filter(
+                PostChannel.status == ChannelStatus.PENDING,
+                or_(PostChannel.scheduled_at == None, PostChannel.scheduled_at <= now),
+                or_(PostChannel.retry_after == None, PostChannel.retry_after <= now),
+            )
             .all()
         )
-
-        due = [
-            ch for ch in pending
-            if (ch.scheduled_at is None or ch.scheduled_at <= now)
-            and (ch.retry_after is None or ch.retry_after <= now)
-        ]
 
     for channel in due:
         await _publish_channel(channel.id)
