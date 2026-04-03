@@ -26,6 +26,7 @@ RETRY_DELAY_MINUTES = 5   # base delay between retries; actual delay = attempt *
 # Image upload validation (TASK-003)
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 MAX_IMAGE_SIZE_MB = 10
+MAX_IMAGES_PER_POST = 10  # maximum number of images allowed per post
 
 # AI generate rate limiting (TASK-004)
 AI_RATE_LIMIT_PER_MINUTE = 20

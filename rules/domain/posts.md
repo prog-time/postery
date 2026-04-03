@@ -60,7 +60,10 @@ _Enforced in:_ `app/views/posts.py` and `app/worker.py`
 **BR-010** — Image file paths are stored relative to `BASE_DIR` (e.g., `data/uploads/42/photo.jpg`). Absolute paths must never be stored in the database.
 _Enforced in:_ `app/views/posts.py @ PostWizardView._post()` step 1
 
-**BR-011** — Images are appended on step 1 re-submit, not replaced. Deleting individual images is not currently supported through the wizard.
+**BR-011** — Images are appended on step 1 re-submit, not replaced. Individual images can be deleted via `DELETE /api/posts/image/{id}` (called from step 1 UI). The total number of images per post must not exceed `MAX_IMAGES_PER_POST` (10). This limit is enforced both server-side (step 1 POST handler) and client-side (JS file-picker guard).
+_Enforced in:_ `app/views/posts.py @ PostWizardView._post()` step 1, `app/routers/posts.py @ delete_image`, `admin/templates/posts/step1.html` (JS)
+
+**BR-014** — A post may have at most `MAX_IMAGES_PER_POST` (10) images. Attempts to upload more are rejected with an error message stating how many are already attached and how many are being added.
 _Enforced in:_ `app/views/posts.py @ PostWizardView._post()` step 1
 
 **BR-012** — Tags are stored as a raw comma-separated string. They are converted to `#hashtag` format at publish time via `format_tags()`, not at creation time.
@@ -172,7 +175,7 @@ Parts joined with `\n\n`.
 - ❌ Setting `post.status = published` in wizard handlers or API endpoints
 - ❌ Creating `PostChannel` with a status other than `pending`
 - ❌ Storing absolute image file paths in the database
-- ❌ Deleting images during step 1 re-submit
+- ❌ Deleting images during step 1 re-submit (only DELETE /api/posts/image/{id} may delete images)
 - ❌ Reading `post.title` directly in publishers instead of `channel.effective_title`
 - ❌ Lazy-loading ORM relations inside async publisher functions
 

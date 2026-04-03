@@ -213,6 +213,36 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 
 ---
 
+### 2.7 Delete Post Image
+
+```
+DELETE /api/posts/image/{image_id}
+```
+
+Router: `app/routers/posts.py` (prefix `/api/posts`)
+
+**Path parameter:** `image_id` — integer PK of a `post_images` row.
+
+**Success response:**
+```json
+{"ok": true}
+```
+
+**Error response:**
+```json
+{"ok": false, "error": "Изображение не найдено"}
+```
+
+**Side effects:**
+- Deletes the `post_images` row from the database (committed before file removal).
+- Removes the physical file from disk (`BASE_DIR / image.file_path`). File removal errors are logged as warnings but do not fail the response.
+
+**Notes:**
+- No auth check beyond the admin session that owns the UI page.
+- Does not re-order remaining `PostImage.order` values — ordering is preserved implicitly.
+
+---
+
 ## 3. Routing Structure
 
 ```

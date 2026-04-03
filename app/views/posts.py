@@ -9,7 +9,7 @@ from starlette.responses import Response, RedirectResponse
 from starlette.templating import Jinja2Templates
 from starlette_admin.views import CustomView
 
-from app.config import BASE_DIR, ALLOWED_IMAGE_EXTENSIONS, MAX_IMAGE_SIZE_MB
+from app.config import BASE_DIR, ALLOWED_IMAGE_EXTENSIONS, MAX_IMAGE_SIZE_MB, MAX_IMAGES_PER_POST
 from app.database import SessionLocal
 from app.models.post import Post, PostImage, PostChannel, PostStatus, ChannelStatus
 from app.models.sources.telegram import TelegramSource
@@ -178,6 +178,26 @@ class PostWizardView(EditorAccessMixin, CustomView):
                         },
                     )
                 validated.append((img, content))
+
+            # Проверка лимита: текущие + новые не должны превышать MAX_IMAGES_PER_POST
+            existing_count = len(post.images)
+            if existing_count + len(validated) > MAX_IMAGES_PER_POST:
+                db.rollback()
+                post_ctx = db.get(Post, int(post_id)) if post_id else None
+                return templates.TemplateResponse(
+                    request=request,
+                    name="posts/step1.html",
+                    context={
+                        "step": 1,
+                        "post": post_ctx,
+                        "error": (
+                            f"Нельзя прикрепить больше {MAX_IMAGES_PER_POST} изображений. "
+                            f"Уже прикреплено: {existing_count}, добавляется: {len(validated)}."
+                        ),
+                        "form": dict(form),
+                        "wizard_url": wizard_url,
+                    },
+                )
 
             for img, content in validated:
                 upload_dir = UPLOAD_DIR / str(post.id)

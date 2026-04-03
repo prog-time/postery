@@ -119,14 +119,34 @@
                 </h3>
             </div>
             <div class="card-body">
+                {% set existing_count = post.images | length if post else 0 %}
+                {% set max_images = 10 %}
+                {% set remaining = max_images - existing_count %}
+
                 {% if post and post.images %}
-                <div class="row g-2 mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small">
+                        Прикреплено: <strong id="img-count">{{ existing_count }}</strong> / {{ max_images }}
+                    </span>
+                </div>
+                <div class="row g-2 mb-3" id="existing-images">
                     {% for img in post.images %}
-                    <div class="col-auto">
+                    <div class="col-auto position-relative" id="img-wrap-{{ img.id }}">
                         <img src="/{{ img.file_path }}" class="rounded"
                              style="height:72px;width:72px;object-fit:cover;">
+                        <button type="button"
+                                class="btn btn-sm btn-danger position-absolute top-0 end-0 p-0"
+                                style="width:20px;height:20px;line-height:1;font-size:.65rem;border-radius:50%;"
+                                onclick="deleteImage({{ img.id }}, this)"
+                                title="Удалить">×</button>
                     </div>
                     {% endfor %}
+                </div>
+                {% else %}
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small">
+                        Прикреплено: <strong id="img-count">0</strong> / {{ max_images }}
+                    </span>
                 </div>
                 {% endif %}
 
@@ -200,10 +220,25 @@ tagInput.addEventListener('blur', () => { if (tagInput.value) addTag(tagInput.va
 
 renderTags();
 
-/* ── Image upload preview ──────────────────────────────────── */
+/* ── Image upload preview & limit ─────────────────────────── */
+const MAX_IMAGES = 10;
 const area    = document.getElementById('upload-area');
 const imgInput = document.getElementById('images-input');
 const preview = document.getElementById('preview-row');
+const imgCountEl = document.getElementById('img-count');
+
+function currentExistingCount() {
+    const wrap = document.getElementById('existing-images');
+    return wrap ? wrap.querySelectorAll('[id^="img-wrap-"]').length : 0;
+}
+
+function updateCountDisplay() {
+    if (imgCountEl) {
+        const existing = currentExistingCount();
+        const newPreviews = preview.querySelectorAll('.col-auto').length;
+        imgCountEl.textContent = existing + newPreviews;
+    }
+}
 
 area.addEventListener('click',    () => imgInput.click());
 area.addEventListener('dragover',  e => { e.preventDefault(); area.style.background = '#f1f5f9'; });
@@ -212,16 +247,51 @@ area.addEventListener('drop', e => { e.preventDefault(); area.style.background =
 imgInput.addEventListener('change', () => renderImages(imgInput.files));
 
 function renderImages(files) {
-    [...files].forEach(f => {
+    const existing = currentExistingCount();
+    const alreadyQueued = preview.querySelectorAll('.col-auto').length;
+    let slots = MAX_IMAGES - existing - alreadyQueued;
+    const fileArr = [...files];
+    if (slots <= 0) {
+        alert(`Нельзя прикрепить больше ${MAX_IMAGES} изображений.`);
+        imgInput.value = '';
+        return;
+    }
+    const allowed = fileArr.slice(0, slots);
+    if (allowed.length < fileArr.length) {
+        alert(`Можно добавить ещё ${slots} изображений. Лишние файлы проигнорированы.`);
+    }
+    allowed.forEach(f => {
         const r = new FileReader();
         r.onload = e => {
             const d = document.createElement('div');
             d.className = 'col-auto';
             d.innerHTML = `<img src="${e.target.result}" class="rounded" style="height:72px;width:72px;object-fit:cover;">`;
             preview.appendChild(d);
+            updateCountDisplay();
         };
         r.readAsDataURL(f);
     });
+}
+
+/* ── Delete existing image ─────────────────────────────────── */
+async function deleteImage(imageId, btn) {
+    if (!confirm('Удалить это изображение?')) return;
+    btn.disabled = true;
+    try {
+        const resp = await fetch(`/api/posts/image/${imageId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.ok) {
+            const wrap = document.getElementById(`img-wrap-${imageId}`);
+            if (wrap) wrap.remove();
+            updateCountDisplay();
+        } else {
+            alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+            btn.disabled = false;
+        }
+    } catch (err) {
+        alert('Сетевая ошибка при удалении изображения.');
+        btn.disabled = false;
+    }
 }
 </script>
 {% endblock %}

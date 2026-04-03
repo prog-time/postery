@@ -1,10 +1,12 @@
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.config import BASE_DIR
 from app.database import SessionLocal
-from app.models.post import Post, PostChannel, PostStatus, ChannelStatus
+from app.models.post import Post, PostChannel, PostImage, PostStatus, ChannelStatus
 
 router = APIRouter(prefix="/api/posts", tags=["posts"])
 
@@ -56,3 +58,35 @@ async def republish(body: RepublishRequest):
         db.commit()
 
     return {"ok": True, "created": len(parsed_dates)}
+
+
+@router.delete("/image/{image_id}")
+async def delete_image(image_id: int):
+    """Удалить прикреплённое изображение из поста.
+
+    Удаляет запись из post_images и файл с диска.
+    Доступно только авторизованным пользователям (сессия проверяется на уровне
+    admin UI, но этот эндпоинт не добавляет дополнительной server-side auth-проверки
+    т.к. все /api/* маршруты обслуживают только страницы admin-панели).
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    with SessionLocal() as db:
+        image = db.get(PostImage, image_id)
+        if not image:
+            return {"ok": False, "error": "Изображение не найдено"}
+
+        file_path = Path(BASE_DIR) / image.file_path
+        db.delete(image)
+        db.commit()
+
+    # Удаляем файл с диска после фиксации транзакции
+    try:
+        if file_path.exists():
+            file_path.unlink()
+            logger.info("Удалён файл изображения: %s", file_path)
+    except OSError as exc:
+        logger.warning("Не удалось удалить файл %s: %s", file_path, exc)
+
+    return {"ok": True}
