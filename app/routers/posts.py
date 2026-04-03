@@ -20,7 +20,7 @@ async def republish(body: RepublishRequest):
     if not body.dates:
         return {"ok": False, "error": "Укажите хотя бы одну дату"}
 
-    now = datetime.utcnow()
+    now = datetime.now()  # naive local time — согласуется с worker.py и BR-009
     parsed_dates: list[datetime] = []
     for raw in body.dates:
         try:
