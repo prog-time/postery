@@ -88,7 +88,7 @@
 
                         {# Test status #}
                         <div id="ai-test-status" style="display:none;">
-                            <div id="ai-test-msg" class="alert mb-0"></div>
+                            <div id="ai-test-msg" class="alert mb-0" style="display:flex;align-items:center;gap:5px;"></div>
                         </div>
 
                     </div>
@@ -157,7 +157,7 @@
     function showMsg(ok, text) {
         statusDiv.style.display = 'block';
         msgDiv.className = ok ? 'alert alert-success mb-0' : 'alert alert-danger mb-0';
-        msgDiv.innerHTML = `<i class="fa-solid ${ok ? 'fa-check-circle' : 'fa-times-circle'} me-2"></i>${text}`;
+        msgDiv.innerHTML = `<i class="fa-solid ${ok ? 'fa-check-circle' : 'fa-times-circle'}" style="display:flex;${ok ? 'color:#2ab57d;' : ''}"></i>${text}`;
     }
 
     btnTest.addEventListener('click', async () => {
