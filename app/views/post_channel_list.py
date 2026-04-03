@@ -1,5 +1,6 @@
 from math import ceil
 
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
@@ -8,7 +9,7 @@ from starlette_admin.views import CustomView
 
 from app.database import SessionLocal
 from app.models import TelegramSource, VKSource, MAXSource
-from app.models.post import Post, PostChannel
+from app.models.post import Post, PostChannel, PostStatus, ChannelStatus
 
 _LIST_URL        = "/admin/posts"
 _PER_PAGE_DEFAULT = 20
@@ -74,19 +75,45 @@ class PostChannelListView(CustomView):
         if per_page not in _PER_PAGE_OPTIONS:
             per_page = _PER_PAGE_DEFAULT
 
+        filter_source   = request.query_params.get("source", "").strip()
+        filter_status   = request.query_params.get("status", "").strip()
+
         with SessionLocal() as db:
-            # Предзагружаем все источники для быстрого поиска по имени
             tg  = {s.id: s for s in db.query(TelegramSource).all()}
             vk  = {s.id: s for s in db.query(VKSource).all()}
             mx  = {s.id: s for s in db.query(MAXSource).all()}
 
+            # Опции для фильтра «Источник»
+            source_options = []
+            for s in sorted(tg.values(), key=lambda x: x.name):
+                source_options.append({"value": f"telegram:{s.id}", "label": s.name, "type": "Telegram"})
+            for s in sorted(vk.values(), key=lambda x: x.name):
+                source_options.append({"value": f"vk:{s.id}", "label": s.name, "type": "ВКонтакте"})
+            for s in sorted(mx.values(), key=lambda x: x.name):
+                source_options.append({"value": f"max:{s.id}", "label": s.name, "type": "MAX"})
+
             q = db.query(Post).options(joinedload(Post.channels)).order_by(Post.created_at.desc())
             if search:
                 q = q.filter(Post.title.ilike(f"%{search}%"))
+            if filter_status:
+                post_statuses = {s.value for s in PostStatus}
+                if filter_status in post_statuses:
+                    q = q.filter(Post.status == filter_status)
+                else:
+                    q = q.filter(Post.channels.any(PostChannel.status == filter_status))
+            if filter_source:
+                parts = filter_source.split(":")
+                if len(parts) == 2:
+                    try:
+                        q = q.filter(Post.channels.any(
+                            (PostChannel.source_type == parts[0]) &
+                            (PostChannel.source_id == int(parts[1]))
+                        ))
+                    except ValueError:
+                        filter_source = ""
 
             total_posts = q.count()
             posts = q.offset((page - 1) * per_page).limit(per_page).all()
-
             post_rows = [_build_post_row(p, tg, vk, mx) for p in posts]
 
         total_pages  = max(1, ceil(total_posts / per_page))
@@ -105,6 +132,9 @@ class PostChannelListView(CustomView):
                 "search":           search,
                 "list_url":         _LIST_URL,
                 "failed_count":     failed_count,
+                "source_options":   source_options,
+                "filter_source":    filter_source,
+                "filter_status":    filter_status,
             },
         )
 

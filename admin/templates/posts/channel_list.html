@@ -16,9 +16,9 @@
         <div class="col-12">
             <div class="card">
 
-                {# ── Шапка: поиск + счётчик ошибок + кнопка ────────────────── #}
+                {# ── Шапка: поиск + кнопка ──────────────────────────────────── #}
                 <div class="card-header d-flex align-items-center gap-3 flex-wrap">
-                    <form method="GET" action="{{ list_url }}" class="d-flex" style="width:260px;">
+                    <form method="GET" action="{{ list_url }}" id="search-form" class="d-flex" style="width:260px;">
                         <div class="input-icon w-100">
                             <span class="input-icon-addon">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24"
@@ -33,6 +33,9 @@
                                    class="form-control" placeholder="Поиск по заголовку…"
                                    aria-label="Поиск"/>
                         </div>
+                        {# Скрытые поля — сохраняют фильтры при новом поиске #}
+                        {% if filter_source %}<input type="hidden" name="source" value="{{ filter_source }}">{% endif %}
+                        {% if filter_status %}<input type="hidden" name="status" value="{{ filter_status }}">{% endif %}
                     </form>
 
                     {% if failed_count %}
@@ -47,6 +50,45 @@
                         <a href="/admin/posts/wizard" class="btn btn-primary">
                             <i class="fa-solid fa-plus me-2"></i>Создать пост
                         </a>
+                    </div>
+                </div>
+
+                {# ── Панель фильтров ─────────────────────────────────────────── #}
+                {%- set active_filters = (filter_source != '') | int + (filter_status != '') | int -%}
+                <div class="card-header border-top-0" style="background:#f8fafc;">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+
+                        {# Источник — одиночный select #}
+                        <select class="form-select filter-select" name="source" id="filter-source" style="width:220px;">
+                            <option value="">Все источники</option>
+                            {% for opt in source_options %}
+                            <option value="{{ opt.value }}"
+                                    {% if opt.value == filter_source %}selected{% endif %}>
+                                {{ opt.label }} · {{ opt.type }}
+                            </option>
+                            {% endfor %}
+                        </select>
+
+                        {# Статус — одиночный select #}
+                        <select class="form-select filter-select" name="status" id="filter-status" style="width:200px;">
+                            <option value="">Все статусы</option>
+                            <optgroup label="Статус поста">
+                                <option value="draft"     {% if filter_status == 'draft'     %}selected{% endif %}>Черновик</option>
+                                <option value="ready"     {% if filter_status == 'ready'     %}selected{% endif %}>В очереди</option>
+                                <option value="published" {% if filter_status == 'published' %}selected{% endif %}>Опубликован</option>
+                            </optgroup>
+                            <optgroup label="Статус канала">
+                                <option value="pending"   {% if filter_status == 'pending'   %}selected{% endif %}>Запланирован</option>
+                                <option value="failed"    {% if filter_status == 'failed'    %}selected{% endif %}>Ошибка</option>
+                            </optgroup>
+                        </select>
+
+                        {% if active_filters %}
+                        <a href="{{ list_url }}{% if search %}?q={{ search }}{% endif %}"
+                           class="btn btn-outline-danger">
+                            <i class="fa-solid fa-xmark me-1"></i>Сбросить
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -69,26 +111,38 @@
                                 {# ID #}
                                 <td class="text-muted align-top" style="font-size:.8rem;padding-top:.85rem;">#{{ post.post_id }}</td>
 
-                                {# Заголовок + теги + статус поста #}
+                                {# Заголовок + статус поста + теги #}
                                 <td class="align-top" style="white-space:normal;">
                                     <a href="/admin/posts/wizard?post_id={{ post.post_id }}&step=1"
                                        class="fw-semibold text-reset text-decoration-none post-title-link"
                                        style="line-height:1.35;display:block;">{{ post.post_title }}</a>
-                                    <div class="d-flex flex-wrap gap-1 mt-1">
+
+                                    {# Строка 1: статус поста #}
+                                    <div class="mt-1">
                                         {% set ps = post.post_status %}
                                         {% if ps == 'draft' %}
-                                            <span class="status-badge" style="color:#94a3b8;background:rgba(148,163,184,.13);">Черновик</span>
+                                            <span class="status-badge" style="color:#94a3b8;background:rgba(148,163,184,.13);">
+                                                <i class="fa-solid fa-pen-line" style="font-size:.65rem;"></i>Черновик
+                                            </span>
                                         {% elif ps == 'ready' %}
-                                            <span class="status-badge" style="color:#6366f1;background:rgba(99,102,241,.13);">Готов</span>
+                                            <span class="status-badge" style="color:#6366f1;background:rgba(99,102,241,.13);">
+                                                <i class="fa-solid fa-clock" style="font-size:.65rem;"></i>В очереди
+                                            </span>
                                         {% elif ps == 'published' %}
-                                            <span class="status-badge" style="color:#22c55e;background:rgba(34,197,94,.13);">Опубликован</span>
-                                        {% endif %}
-                                        {% if post.post_tags %}
-                                            {% for tag in post.post_tags.split(',') %}
-                                                <span class="badge bg-blue-lt text-blue" style="font-size:.7rem;">{{ tag.strip() }}</span>
-                                            {% endfor %}
+                                            <span class="status-badge" style="color:#22c55e;background:rgba(34,197,94,.13);">
+                                                <i class="fa-solid fa-paper-plane" style="font-size:.65rem;"></i>Опубликован
+                                            </span>
                                         {% endif %}
                                     </div>
+
+                                    {# Строка 2: теги — только если есть #}
+                                    {% if post.post_tags %}
+                                    <div class="d-flex flex-wrap gap-1 mt-2">
+                                        {% for tag in post.post_tags.split(',') %}
+                                            <span class="post-tag">#{{ tag.strip() }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
                                 </td>
 
                                 {# Вложенные каналы #}
@@ -109,7 +163,7 @@
                                             {# Статус #}
                                             {% set cs = ch.ch_status %}
                                             {% if cs == 'pending' %}
-                                                <span class="status-badge status-badge--sm" style="color:#f59e0b;background:rgba(245,158,11,.13);">Ожидает</span>
+                                                <span class="status-badge status-badge--sm" style="color:#f59e0b;background:rgba(245,158,11,.13);">Запланирован</span>
                                             {% elif cs == 'published' %}
                                                 <span class="status-badge status-badge--sm" style="color:#22c55e;background:rgba(34,197,94,.13);">Опубликован</span>
                                             {% elif cs == 'failed' %}
@@ -150,9 +204,16 @@
                                             </div>
                                         </div>
                                         {% endfor %}
+                                        <a href="/admin/posts/add-channel?post_id={{ post.post_id }}"
+                                           class="ch-add-btn">
+                                            <i class="fa-solid fa-plus"></i> Добавить источник
+                                        </a>
                                     </div>
                                     {% else %}
-                                        <span class="text-muted" style="font-size:.82rem;">Источники не выбраны</span>
+                                        <a href="/admin/posts/add-channel?post_id={{ post.post_id }}"
+                                           class="ch-add-btn">
+                                            <i class="fa-solid fa-plus"></i> Добавить источник
+                                        </a>
                                     {% endif %}
                                 </td>
 
@@ -192,8 +253,12 @@
                 </div>
 
                 {# ── Футер: счётчик + селектор размера + пагинация ──────────── #}
-                {% if total_pages > 1 or rows %}
-                {%- set pp = "&per_page=" ~ per_page if per_page != 20 else "" -%}
+                {% if total_pages > 1 or post_rows %}
+                {%- set _fqs = "" -%}
+                {%- if per_page != 20  %}{%- set _fqs = _fqs ~ "&per_page=" ~ per_page    -%}{% endif %}
+                {%- if search          %}{%- set _fqs = _fqs ~ "&q="        ~ search       -%}{% endif %}
+                {%- if filter_source %}{%- set _fqs = _fqs ~ "&source=" ~ filter_source -%}{% endif %}
+                {%- if filter_status %}{%- set _fqs = _fqs ~ "&status=" ~ filter_status -%}{% endif %}
                 <div class="card-footer d-flex align-items-center gap-3 flex-wrap">
                     <p class="m-0 text-muted" style="font-size:.8rem;">
                         Постов: {{ total_posts }}
@@ -202,9 +267,7 @@
                     {# Селектор количества постов на странице #}
                     <div class="d-flex align-items-center gap-2 ms-2" style="font-size:.8rem;">
                         <label class="text-muted mb-0" for="per-page-select">Постов на странице:</label>
-                        <select id="per-page-select" class="form-select form-select-sm"
-                                style="width:70px;"
-                                onchange="window.location.href='{{ list_url }}?page=1&per_page='+this.value+'{% if search %}&q={{ search }}{% endif %}'">
+                        <select id="per-page-select" class="form-select form-select-sm" style="width:70px;">
                             {% for opt in per_page_options %}
                             <option value="{{ opt }}" {% if opt == per_page %}selected{% endif %}>{{ opt }}</option>
                             {% endfor %}
@@ -216,7 +279,7 @@
                         <ul class="pagination pagination-sm m-0 gap-1">
                             {% if page > 1 %}
                                 <li class="page-item">
-                                    <a class="pag-btn" href="{{ list_url }}?page={{ page - 1 }}{{ pp }}{% if search %}&q={{ search }}{% endif %}">‹</a>
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ page - 1 }}{{ _fqs }}">‹</a>
                                 </li>
                             {% endif %}
 
@@ -226,7 +289,7 @@
 
                             {% if win_start > 1 %}
                                 <li class="page-item">
-                                    <a class="pag-btn" href="{{ list_url }}?page=1{{ pp }}{% if search %}&q={{ search }}{% endif %}">1</a>
+                                    <a class="pag-btn" href="{{ list_url }}?page=1{{ _fqs }}">1</a>
                                 </li>
                                 {% if win_start > 2 %}<li class="page-item disabled"><span class="pag-sep">···</span></li>{% endif %}
                             {% endif %}
@@ -234,20 +297,20 @@
                             {% for p in range(win_start, win_end + 1) %}
                                 <li class="page-item">
                                     <a class="pag-btn {% if p == page %}pag-btn--active{% endif %}"
-                                       href="{{ list_url }}?page={{ p }}{{ pp }}{% if search %}&q={{ search }}{% endif %}">{{ p }}</a>
+                                       href="{{ list_url }}?page={{ p }}{{ _fqs }}">{{ p }}</a>
                                 </li>
                             {% endfor %}
 
                             {% if win_end < total_pages %}
                                 {% if win_end < total_pages - 1 %}<li class="page-item disabled"><span class="pag-sep">···</span></li>{% endif %}
                                 <li class="page-item">
-                                    <a class="pag-btn" href="{{ list_url }}?page={{ total_pages }}{{ pp }}{% if search %}&q={{ search }}{% endif %}">{{ total_pages }}</a>
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ total_pages }}{{ _fqs }}">{{ total_pages }}</a>
                                 </li>
                             {% endif %}
 
                             {% if page < total_pages %}
                                 <li class="page-item">
-                                    <a class="pag-btn" href="{{ list_url }}?page={{ page + 1 }}{{ pp }}{% if search %}&q={{ search }}{% endif %}">›</a>
+                                    <a class="pag-btn" href="{{ list_url }}?page={{ page + 1 }}{{ _fqs }}">›</a>
                                 </li>
                             {% endif %}
                         </ul>
@@ -334,6 +397,17 @@
     .pag-btn.pag-btn--active { background: #6366f1; border-color: #6366f1; color: #fff; pointer-events: none; }
     .pag-sep { color: #cbd5e1; font-size: .85rem; padding: 0 .2rem; }
 
+    /* ── Теги поста ── */
+    .post-tag {
+        font-size: .7rem;
+        color: #64748b;
+        background: transparent;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        padding: .05rem .35rem;
+        white-space: nowrap;
+    }
+
     /* ── Строка поста ── */
     table tbody tr.post-row { cursor: default; }
     table tbody tr.no-hover:hover > td { background: transparent !important; }
@@ -381,6 +455,24 @@
     }
     .ch-btn:hover { background: #e2e8f0; }
     .ch-btn:focus { outline: none; box-shadow: none; }
+
+    .ch-add-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        font-size: .78rem;
+        font-weight: 500;
+        color: #94a3b8;
+        text-decoration: none;
+        padding: .25rem .5rem;
+        border-radius: 6px;
+        border: 1px dashed #cbd5e1;
+        background: transparent;
+        transition: background .12s, border-color .12s, color .12s;
+        white-space: nowrap;
+        margin-top: .1rem;
+    }
+    .ch-add-btn:hover { background: #f1f5f9; border-color: #94a3b8; color: #475569; text-decoration: none; }
 </style>
 {% endblock %}
 
@@ -390,6 +482,25 @@
 (function () {
     // Тултипы для бейджей FAILED
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+    // ── Фильтры — авто-навигация при изменении ───────────────────────────────
+    document.querySelectorAll('.filter-select').forEach(sel => {
+        sel.addEventListener('change', function () {
+            const params = new URLSearchParams(window.location.search);
+            params.set('page', '1');
+            if (this.value) params.set(this.name, this.value);
+            else params.delete(this.name);
+            window.location.href = '{{ list_url }}?' + params.toString();
+        });
+    });
+
+    // ── Выбор количества постов на странице ──────────────────────────────────
+    document.getElementById('per-page-select').addEventListener('change', function () {
+        const params = new URLSearchParams(window.location.search);
+        params.set('per_page', this.value);
+        params.set('page', '1');
+        window.location.href = '{{ list_url }}?' + params.toString();
+    });
 
     // ── Перепубликация ────────────────────────────────────────────────────────
     (function () {
