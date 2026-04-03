@@ -30,7 +30,7 @@ class AIProvider(Base):
     scope: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Базовый системный промпт — применяется ко всем запросам генерации.
-    # Prepend-ится перед source/custom prompt через двойной перенос строки.
+    # Включается перед source/custom prompt через двойной перенос строки.
     # Если пустой — ведёт себя как раньше (нет глобальной инструкции).
     base_prompt: Mapped[str | None] = mapped_column(String, nullable=True)
 
