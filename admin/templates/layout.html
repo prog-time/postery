@@ -17,18 +17,30 @@
                             data-bs-target="#sidebar-menu"
                             aria-expanded="false"
                             aria-controls="sidebar-menu">
-                        <span class="navbar-toggler-icon"></span>
+                        <span class="toggler-icon toggler-icon--open">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="3" y1="6"  x2="21" y2="6"/>
+                                <line x1="3" y1="12" x2="21" y2="12"/>
+                                <line x1="3" y1="18" x2="21" y2="18"/>
+                            </svg>
+                        </span>
+                        <span class="toggler-icon toggler-icon--close">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6"  x2="6"  y2="18"/>
+                                <line x1="6"  y1="6"  x2="18" y2="18"/>
+                            </svg>
+                        </span>
                     </button>
-                    <h1 class="navbar-brand navbar-brand-autodark">
+                    <div class="navbar-brand navbar-brand-autodark" style="height: 60px">
                         <a class="brand-link" href="{{ url_for(__name__ ~ ':index') }}">
                             {% if logo_url %}
                                 <img src="{{ logo_url }}"
                                      class="navbar-logo"/>
                             {% else %}
-                                <h3>{{ app_title }}</h3>
+                                <span class="brand-title">{{ app_title }}</span>
                             {% endif %}
                         </a>
-                    </h1>
+                    </div>
                     {% if current_user or i18n_config.language_switcher %}
                         <div class="navbar-nav flex-row d-lg-none">
                             {% if i18n_config.language_switcher %}
@@ -126,7 +138,7 @@
         {% endblock %}
         {% block navbar %}
             {% if current_user or i18n_config.language_switcher or (timezone_config and timezone_config.timezone_switcher) %}
-                <header class="navbar navbar-expand-md navbar-light d-none d-lg-flex d-print-none">
+                <header class="navbar navbar-expand-md navbar-light d-none d-lg-flex d-print-none" style="height: 60px">
                     <div class="container-xl">
                         <button class="navbar-toggler"
                                 type="button"
@@ -246,13 +258,13 @@
             {% endif %}
         {% endblock %}
         <div class="page-wrapper">
-            <div style="width:100%;padding:0 1.25rem;">
+            <div class="page-content-wrap">
                 <div class="page-header d-print-none">
                     {% block header %}{% endblock %}
                 </div>
             </div>
             <div class="page-body flex-grow-1">
-                <div style="width:100%;padding:0 1.25rem;">
+                <div class="page-content-wrap">
                     <div class="row" style="--bs-gutter-x:0;">
                         {% block content %}{% endblock %}
                     </div>

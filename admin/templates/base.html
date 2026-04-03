@@ -31,34 +31,36 @@
 
         body { font-feature-settings: "cv03","cv04","cv11"; }
 
-        /* ── Sidebar ────────────────────────────────────────────────── */
+        .page-header h1 {
+            margin: 0;
+        }
+
+        /* ── Sidebar — общие стили ──────────────────────────────────── */
         .navbar-vertical {
             background: var(--sidebar-bg) !important;
-            border-right: 1px solid var(--sidebar-border) !important;
-            width: 260px;
         }
 
         /* Brand / logo area */
         .navbar-vertical .navbar-brand {
-            padding: 1.25rem 1.5rem;
+            padding: 1rem 1.25rem;
             border-bottom: 1px solid var(--sidebar-border);
-            margin-bottom: .5rem;
+            justify-content: flex-start;
         }
-        .navbar-vertical .navbar-brand h3 {
+        .navbar-vertical .navbar-brand .brand-link {
+            text-decoration: none;
+        }
+        .navbar-vertical .navbar-brand .brand-title {
             color: #fff;
             font-weight: 700;
             font-size: 1.1rem;
             letter-spacing: -.3px;
-            margin: 0;
         }
-        .navbar-vertical .navbar-brand h3::before {
+        .navbar-vertical .navbar-brand .brand-title::before {
             content: '⚡ ';
             font-size: .9em;
         }
 
         /* Nav items */
-        .navbar-vertical .nav-item { margin: 2px 12px; }
-
         .navbar-vertical .nav-link {
             color: var(--sidebar-text) !important;
             font-size: .875rem;
@@ -81,7 +83,6 @@
         }
         .navbar-vertical .nav-link i,
         .navbar-vertical .nav-link svg { opacity: .8; }
-        /* всегда показывать иконки в сайдбаре */
         .navbar-vertical .nav-link-icon { display: inline-flex !important; align-items: center; }
 
         /* Dropdown sub-items */
@@ -111,6 +112,65 @@
             transform: rotate(90deg);
         }
 
+        /* ── Mobile (< lg) ──────────────────────────────────────────── */
+        @media (max-width: 991.98px) {
+            .navbar-vertical {
+                width: 100% !important;
+                border-right: none !important;
+                border-bottom: 1px solid var(--sidebar-border);
+                position: relative !important;
+            }
+            .navbar-vertical .navbar-brand {
+                border-bottom: none;
+                margin-bottom: 0;
+                padding: .7rem 0;
+            }
+            .navbar-vertical .navbar-toggler {
+                border-color: rgba(255,255,255,.2);
+                padding: .35rem .55rem;
+                position: relative;
+                width: 43px;
+                height: 43px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .navbar-vertical .navbar-toggler:focus { box-shadow: none; }
+
+            .toggler-icon {
+                position: absolute;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #cbd5e1;
+                transition: opacity .2s ease, transform .2s ease;
+            }
+            .toggler-icon--open  { opacity: 1;  transform: rotate(0deg); }
+            .toggler-icon--close { opacity: 0;  transform: rotate(-90deg); }
+
+            .navbar-toggler[aria-expanded="true"] .toggler-icon--open  { opacity: 0;  transform: rotate(90deg); }
+            .navbar-toggler[aria-expanded="true"] .toggler-icon--close { opacity: 1;  transform: rotate(0deg); }
+            .navbar-vertical .navbar-collapse {
+                border-top: 1px solid var(--sidebar-border);
+                background: var(--sidebar-bg);
+                padding: .5rem 0 .75rem;
+            }
+            .navbar-vertical .nav-item { margin: 1px 8px; }
+        }
+
+        /* ── Desktop (>= lg) ────────────────────────────────────────── */
+        @media (min-width: 992px) {
+            .navbar-vertical {
+                width: 260px;
+                border-right: 1px solid var(--sidebar-border) !important;
+            }
+            .navbar-vertical .navbar-brand {
+                padding: 1.25rem 1.5rem;
+                margin-bottom: .5rem;
+            }
+            .navbar-vertical .nav-item { margin: 2px 12px; }
+        }
+
         /* User avatar in top-bar */
         .avatar { background: var(--sidebar-accent-bg); }
 
@@ -122,6 +182,12 @@
 
         /* ── Page background ────────────────────────────────────────── */
         .page-wrapper { background: #f8fafc; }
+
+        .page-content-wrap { width: 100%; padding: 0 1.25rem; }
+
+        @media (max-width: 767.98px) {
+            .page-content-wrap { padding: 0; }
+        }
 
         /* ── Cards ──────────────────────────────────────────────────── */
         .card {
