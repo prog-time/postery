@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+log_audit = logging.getLogger("admin.audit")
 
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
@@ -46,8 +47,10 @@ class PostWizardView(EditorAccessMixin, CustomView):
 
     async def _get(self, request, templates, db, step, post_id, channel_id):
         wizard_url = str(request.url).split("?")[0]
+        user_id = request.session.get("user_id")
 
         if step == 1:
+            log_audit.info("Post wizard step=1 post_id=%s user_id=%s", post_id, user_id)
             post = db.get(Post, int(post_id)) if post_id else None
             return templates.TemplateResponse(
                 request=request,
@@ -56,6 +59,7 @@ class PostWizardView(EditorAccessMixin, CustomView):
             )
 
         if step == 2:
+            log_audit.info("Post wizard step=2 post_id=%s user_id=%s", post_id, user_id)
             post = db.get(Post, int(post_id))
             tg_sources  = db.query(TelegramSource).filter_by(is_active=True).all()
             vk_sources  = db.query(VKSource).filter_by(is_active=True).all()
@@ -75,6 +79,7 @@ class PostWizardView(EditorAccessMixin, CustomView):
             )
 
         if step == 3:
+            log_audit.info("Post wizard step=3 post_id=%s user_id=%s", post_id, user_id)
             from_list = request.query_params.get("from_list") == "1"
             post = db.get(Post, int(post_id))
             channel = db.get(PostChannel, int(channel_id))
@@ -113,6 +118,7 @@ class PostWizardView(EditorAccessMixin, CustomView):
     async def _post(self, request, templates, db, step, post_id, channel_id):
         form = await request.form()
         wizard_url = str(request.url).split("?")[0]
+        user_id = request.session.get("user_id")
 
         # ── Шаг 1: создать/обновить пост ────────────────────────────────────
         if step == 1:
@@ -221,6 +227,7 @@ class PostWizardView(EditorAccessMixin, CustomView):
                 ))
 
             db.commit()
+            log_audit.info("Post saved post_id=%d status=%s user_id=%s", post.id, post.status, user_id)
             return RedirectResponse(f"{wizard_url}?post_id={post.id}&step=2", status_code=302)
 
         # ── Шаг 2: выбрать источники ─────────────────────────────────────────
@@ -304,6 +311,7 @@ class PostWizardView(EditorAccessMixin, CustomView):
             # Все каналы настроены
             post.status = PostStatus.READY
             db.commit()
+            log_audit.info("Post saved post_id=%d status=%s user_id=%s", post.id, post.status, user_id)
             return RedirectResponse("/admin/posts", status_code=302)
 
 

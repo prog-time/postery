@@ -1,3 +1,5 @@
+import logging
+
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
 from starlette.templating import Jinja2Templates
@@ -5,6 +7,8 @@ from starlette_admin.views import CustomView
 
 from app.database import SessionLocal
 from app.models.providers import AIProvider, ProviderType
+
+log_audit = logging.getLogger("admin.audit")
 
 _LIST_URL = "/admin/ai-provider/list"
 
@@ -88,15 +92,19 @@ class AIProviderWizardView(CustomView):
             if is_active:
                 db.query(AIProvider).update({"is_active": False})
                 db.flush()
-            db.add(AIProvider(
+            provider = AIProvider(
                 provider_type=ProviderType(provider_type),
                 api_key=api_key,
                 base_url=base_url,
                 scope=scope,
                 base_prompt=base_prompt,
                 is_active=is_active,
-            ))
+            )
+            db.add(provider)
             db.commit()
+            user_id = request.session.get("user_id")
+            if is_active:
+                log_audit.info("AI provider activated provider_id=%d type=%s user_id=%s", provider.id, provider_type, user_id)
 
         return RedirectResponse(_LIST_URL, status_code=302)
 
@@ -146,5 +154,8 @@ class AIProviderWizardView(CustomView):
                     {"is_active": False}
                 )
             db.commit()
+            user_id = request.session.get("user_id")
+            if is_active:
+                log_audit.info("AI provider activated provider_id=%d type=%s user_id=%s", provider.id, provider_type, user_id)
 
         return RedirectResponse(_LIST_URL, status_code=302)

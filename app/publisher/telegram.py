@@ -1,6 +1,9 @@
 """Публикация PostChannel в Telegram через Bot API."""
 import json
+import logging
 import httpx
+
+log = logging.getLogger("publisher.telegram")
 
 TG_API = "https://api.telegram.org/bot{token}/{method}"
 
@@ -15,6 +18,15 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
     chat_id = source.chat_id
     thread_id = source.thread_id
 
+    if not image_paths:
+        method_name = "sendMessage"
+    elif len(image_paths) == 1:
+        method_name = "sendPhoto"
+    else:
+        method_name = "sendMediaGroup"
+
+    log.info("Telegram publish → chat_id=%s method=%s images=%d", chat_id, method_name, len(image_paths))
+
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             if not image_paths:
@@ -24,12 +36,15 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
             else:
                 await _send_media_group(client, token, chat_id, thread_id, image_paths, text)
 
+        log.info("Telegram publish success chat_id=%s", chat_id)
         return True, None
 
     except httpx.HTTPStatusError as e:
+        log.error("Telegram HTTP %d for chat_id=%s: %s", e.response.status_code, chat_id, e.response.text[:200])
         return False, f"Telegram HTTP {e.response.status_code}: {e.response.text[:200]}"
-    except Exception as e:
-        return False, str(e)[:500]
+    except Exception:
+        log.exception("Telegram publish failed for chat_id=%s", chat_id)
+        return False, "Непредвиденная ошибка при публикации в Telegram"
 
 
 async def _send_message(client, token, chat_id, thread_id, text):

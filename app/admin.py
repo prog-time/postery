@@ -15,7 +15,11 @@ from starlette_admin import (
 from starlette_admin.actions import link_row_action
 from starlette_admin.exceptions import FormValidationError
 
+import logging
+
 from app.config import SECRET_KEY, TEMPLATES_DIR, STATICS_DIR
+
+log_audit = logging.getLogger("admin.audit")
 from app.database import engine, SessionLocal
 from app.models import TelegramSource, VKSource, MAXSource, AdminUser, Role
 from app.models import Post, PostChannel, PostStatus, ChannelStatus
@@ -29,6 +33,7 @@ from app.views.ai_provider import AIProviderWizardView
 from app.views.telegram_source import TelegramSourceWizardView
 from app.views.vk_source import VKSourceWizardView
 from app.views.max_source import MAXSourceWizardView
+from app.views.logs import LogsView
 from app.fields import TokenField, PasswordField, TranslatedEnumField
 from app.auth import hash_password
 
@@ -349,6 +354,18 @@ class AdminUserView(SuperadminOnly, ModelView):
         elif not is_created:
             data["password_hash"] = model.password_hash
 
+    async def after_create(self, request: Request, obj: Any) -> None:
+        user_id = request.session.get("user_id")
+        log_audit.warning("Admin user modified target_id=%d action=create by user_id=%s", obj.id, user_id)
+
+    async def after_edit(self, request: Request, obj: Any) -> None:
+        user_id = request.session.get("user_id")
+        log_audit.warning("Admin user modified target_id=%d action=edit by user_id=%s", obj.id, user_id)
+
+    async def after_delete(self, request: Request, obj: Any) -> None:
+        user_id = request.session.get("user_id")
+        log_audit.warning("Admin user modified target_id=%d action=delete by user_id=%s", obj.id, user_id)
+
 
 # ── Фабрика Admin ────────────────────────────────────────────────────────────
 
@@ -404,5 +421,8 @@ def create_admin() -> Admin:
             ],
         )
     )
+
+    # Система — TASK-LOG-005
+    admin.add_view(LogsView())
 
     return admin

@@ -1,3 +1,5 @@
+import logging
+
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
 from starlette.templating import Jinja2Templates
@@ -5,6 +7,8 @@ from starlette_admin.views import CustomView
 
 from app.database import SessionLocal
 from app.models import MAXSource
+
+log_audit = logging.getLogger("admin.audit")
 
 _LIST_URL = "/admin/m-a-x-source/list"
 
@@ -68,13 +72,16 @@ class MAXSourceWizardView(CustomView):
                                 errors=errors, form=dict(form))
 
         with SessionLocal() as db:
-            db.add(MAXSource(
+            source = MAXSource(
                 name=name,
                 bot_token=bot_token,
                 chat_id=chat_id,
                 is_active=is_active,
-            ))
+            )
+            db.add(source)
             db.commit()
+            user_id = request.session.get("user_id")
+            log_audit.info("Source created source_type=max source_id=%d user_id=%s", source.id, user_id)
 
         return RedirectResponse(_LIST_URL, status_code=302)
 
@@ -130,5 +137,7 @@ class MAXSourceWizardView(CustomView):
             if bot_token:
                 source.bot_token = bot_token
             db.commit()
+            user_id = request.session.get("user_id")
+            log_audit.info("Source modified source_type=max source_id=%d user_id=%s", source.id, user_id)
 
         return RedirectResponse(_LIST_URL, status_code=302)

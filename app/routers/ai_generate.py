@@ -92,11 +92,15 @@ async def generate_text(request: Request, body: GenerateRequest):
     )
 
     if provider.provider_type == ProviderType.OPENAI:
-        return await _generate_openai(provider.api_key, provider.base_url, system_msg, user_msg)
-    if provider.provider_type == ProviderType.GIGACHAT:
-        return await _generate_gigachat(provider.api_key, provider.scope, system_msg, user_msg)
+        result = await _generate_openai(provider.api_key, provider.base_url, system_msg, user_msg)
+    elif provider.provider_type == ProviderType.GIGACHAT:
+        result = await _generate_gigachat(provider.api_key, provider.scope, system_msg, user_msg)
+    else:
+        return {"ok": False, "error": "Неизвестный тип провайдера"}
 
-    return {"ok": False, "error": "Неизвестный тип провайдера"}
+    if result.get("ok"):
+        logger.info("AI generate success — provider=%s field=%s", provider.provider_type, body.field)
+    return result
 
 
 def _get_source(db, source_type: str, source_id: int):
@@ -125,14 +129,17 @@ async def _generate_openai(api_key: str, base_url: str | None, system_msg: str |
             )
         data = resp.json()
         if resp.status_code != 200:
+            logger.error("OpenAI HTTP %d: %s", resp.status_code, data.get("error", {}).get("message", ""))
             msg = data.get("error", {}).get("message") or f"HTTP {resp.status_code}"
             return {"ok": False, "error": msg}
         result = data["choices"][0]["message"]["content"].strip()
         return {"ok": True, "result": result}
     except httpx.TimeoutException:
+        logger.warning("OpenAI request timeout")
         return {"ok": False, "error": "Превышено время ожидания"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    except Exception:
+        logger.exception("OpenAI generate failed")
+        return {"ok": False, "error": "Непредвиденная ошибка при обращении к OpenAI"}
 
 
 async def _get_gigachat_token(api_key: str, scope: str | None) -> tuple[str | None, str | None]:
@@ -163,14 +170,16 @@ async def _get_gigachat_token(api_key: str, scope: str | None) -> tuple[str | No
                     data={"scope": scope or "GIGACHAT_API_PERS"},
                 )
         if auth_resp.status_code != 200:
+            logger.error("GigaChat OAuth failed: HTTP %d", auth_resp.status_code)
             return None, f"Ошибка авторизации GigaChat: HTTP {auth_resp.status_code}"
         token = auth_resp.json().get("access_token")
         _gigachat_cache["token"] = token
         _gigachat_cache["expires_at"] = now + timedelta(seconds=29 * 60)
         _gigachat_cache["api_key_hash"] = key_hash
         return token, None
-    except Exception as e:
-        return None, f"Ошибка авторизации GigaChat: {e}"
+    except Exception:
+        logger.exception("GigaChat OAuth failed")
+        return None, "Ошибка авторизации GigaChat"
 
 
 async def _generate_gigachat(api_key: str, scope: str | None, system_msg: str | None, user_msg: str) -> dict:
@@ -194,11 +203,14 @@ async def _generate_gigachat(api_key: str, scope: str | None, system_msg: str | 
                 )
         data = resp.json()
         if resp.status_code != 200:
+            logger.error("GigaChat HTTP %d: %s", resp.status_code, data.get("message", ""))
             msg = data.get("message") or f"HTTP {resp.status_code}"
             return {"ok": False, "error": msg}
         result = data["choices"][0]["message"]["content"].strip()
         return {"ok": True, "result": result}
     except httpx.TimeoutException:
+        logger.warning("GigaChat request timeout")
         return {"ok": False, "error": "Превышено время ожидания"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    except Exception:
+        logger.exception("GigaChat generate failed")
+        return {"ok": False, "error": "Непредвиденная ошибка при обращении к GigaChat"}

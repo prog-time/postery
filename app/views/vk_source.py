@@ -1,3 +1,5 @@
+import logging
+
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
 from starlette.templating import Jinja2Templates
@@ -5,6 +7,8 @@ from starlette_admin.views import CustomView
 
 from app.database import SessionLocal
 from app.models import VKSource
+
+log_audit = logging.getLogger("admin.audit")
 
 _LIST_URL = "/admin/v-k-source/list"
 
@@ -75,13 +79,16 @@ class VKSourceWizardView(CustomView):
                                 errors=errors, form=dict(form))
 
         with SessionLocal() as db:
-            db.add(VKSource(
+            source = VKSource(
                 name=name,
                 access_token=access_token,
                 group_id=group_id,
                 is_active=is_active,
-            ))
+            )
+            db.add(source)
             db.commit()
+            user_id = request.session.get("user_id")
+            log_audit.info("Source created source_type=vk source_id=%d user_id=%s", source.id, user_id)
 
         return RedirectResponse(_LIST_URL, status_code=302)
 
@@ -144,5 +151,7 @@ class VKSourceWizardView(CustomView):
             if access_token:
                 source.access_token = access_token
             db.commit()
+            user_id = request.session.get("user_id")
+            log_audit.info("Source modified source_type=vk source_id=%d user_id=%s", source.id, user_id)
 
         return RedirectResponse(_LIST_URL, status_code=302)
