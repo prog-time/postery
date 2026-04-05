@@ -347,12 +347,17 @@ class AdminUserView(SuperadminOnly, ModelView):
     sortable_fields = ["id", "username", "role", "is_active"]
     searchable_fields = ["username"]
 
-    async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
+    async def before_create(self, request: Request, data: dict, obj: Any) -> None:
         password = (data.get("password_hash") or "").strip()
         if password:
             data["password_hash"] = hash_password(password)
-        elif not is_created:
-            data["password_hash"] = model.password_hash
+
+    async def before_edit(self, request: Request, data: dict, obj: Any) -> None:
+        password = (data.get("password_hash") or "").strip()
+        if password:
+            data["password_hash"] = hash_password(password)
+        else:
+            data["password_hash"] = obj.password_hash
 
     async def after_create(self, request: Request, obj: Any) -> None:
         user_id = request.session.get("user_id")
