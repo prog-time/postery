@@ -12,6 +12,16 @@
 {% block head_css %}
 <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
 <style>
+/* ── Restore Font Awesome 6 overridden by EasyMDE (FA4) ────────────────── */
+:not(.editor-toolbar) .fa,
+:not(.editor-toolbar) .fas,
+:not(.editor-toolbar) .far,
+:not(.editor-toolbar) .fab {
+    font-family: var(--fa-style-family, "Font Awesome 6 Free") !important;
+    font-weight: var(--fa-style, 900) !important;
+}
+</style>
+<style>
 /* ── Tag input ─────────────────────────────────────────────────────────── */
 .tag-input-wrap {
     display: flex;
@@ -173,6 +183,8 @@
         </div>
     </form>
 </div>
+
+{% endblock %}
 
 {% block script %}
 <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
@@ -336,6 +348,4 @@ async function deleteImage(imageId, btn) {
     }
 }
 </script>
-{% endblock %}
-
 {% endblock %}
