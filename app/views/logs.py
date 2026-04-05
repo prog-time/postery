@@ -28,6 +28,7 @@ class LogsView(SuperadminOnly, CustomView):
             text = LOGS_FILE.read_text(encoding="utf-8", errors="replace")
             lines = text.splitlines()[-DISPLAY_LINES:]
         return templates.TemplateResponse(
-            "logs.html",
-            {"request": request, "lines": lines, "total": len(lines)},
+            request=request,
+            name="logs.html",
+            context={"lines": lines, "total": len(lines)},
         )
