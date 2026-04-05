@@ -659,7 +659,11 @@
         submitBtn.addEventListener('click', async () => {
             errorEl.style.display = 'none';
             const inputs = datesList.querySelectorAll('.rp-date-input');
-            const dates  = [...inputs].map(i => i.value).filter(Boolean);
+            // Конвертируем локальное время в UTC перед отправкой на сервер
+            const dates  = [...inputs]
+                .map(i => i.value)
+                .filter(Boolean)
+                .map(v => new Date(v).toISOString().slice(0, 16));
 
             if (!dates.length) {
                 errorEl.textContent = 'Укажите хотя бы одну дату';

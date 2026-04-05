@@ -132,6 +132,15 @@ window.postDescriptionEditor = new EasyMDE({
     status: false,
     minHeight: "200px",
 });
+
+// Перед отправкой формы — конвертируем datetime-local из локального в UTC
+document.querySelector('form').addEventListener('submit', function() {
+    const input = this.querySelector('[name="scheduled_at"]');
+    if (input && input.value) {
+        const local = new Date(input.value); // парсит как локальное время
+        input.value = local.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM" в UTC
+    }
+});
 </script>
 {{ super() }}
 {{ ai_script(auto_generate=auto_generate) }}

@@ -36,7 +36,7 @@ async def run_worker():
 
 
 async def _process_due_channels():
-    now = datetime.now()  # naive local — совпадает с тем, что хранит datetime-local input
+    now = datetime.utcnow()  # naive UTC — совпадает с тем, что хранит datetime-local input после конвертации на фронте
 
     with SessionLocal() as db:
         due = (
@@ -102,7 +102,7 @@ async def _publish_channel(channel_id: int):
 
         if success:
             channel.status = ChannelStatus.PUBLISHED
-            channel.published_at = datetime.now()
+            channel.published_at = datetime.utcnow()
             channel.error_message = None
             # attempt is preserved for analytics (per AC-6)
         else:
@@ -112,7 +112,7 @@ async def _publish_channel(channel_id: int):
             if channel.attempt < MAX_ATTEMPTS:
                 # Остаётся PENDING; следующая попытка через attempt * RETRY_DELAY_MINUTES мин
                 delay_minutes = channel.attempt * RETRY_DELAY_MINUTES
-                channel.retry_after = datetime.now() + timedelta(minutes=delay_minutes)
+                channel.retry_after = datetime.utcnow() + timedelta(minutes=delay_minutes)
                 log.warning(
                     "Channel %d: attempt %d/%d, retry in %d min",
                     channel_id, channel.attempt, MAX_ATTEMPTS, delay_minutes,
