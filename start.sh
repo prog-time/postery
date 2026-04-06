@@ -34,6 +34,7 @@ source .venv/bin/activate
 # ── Dependencies ─────────────────────────────────────────────────────────────
 echo -e "${YELLOW}[2/3] Installing dependencies...${RESET}"
 pip install -q -r requirements.txt
+pip install -q psycopg2-binary
 echo -e "${GREEN}      Done.${RESET}"
 
 # ── Env file ─────────────────────────────────────────────────────────────────

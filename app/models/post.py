@@ -25,7 +25,7 @@ class Post(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[str | None] = mapped_column(String(512), nullable=True)  # через запятую
     status: Mapped[PostStatus] = mapped_column(
-        Enum(PostStatus), default=PostStatus.DRAFT, nullable=False
+        Enum(PostStatus, native_enum=False), default=PostStatus.DRAFT, nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -69,7 +69,7 @@ class PostChannel(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[ChannelStatus] = mapped_column(
-        Enum(ChannelStatus), default=ChannelStatus.PENDING, nullable=False
+        Enum(ChannelStatus, native_enum=False), default=ChannelStatus.PENDING, nullable=False
     )
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

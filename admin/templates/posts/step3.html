@@ -2,7 +2,17 @@
 {% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
 
 {% block head_css %}
-<link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+<link rel="stylesheet" href="/admin/statics/css/easymde.min.css">
+<style>
+/* ── Restore Font Awesome 6 overridden by EasyMDE (FA4) ────────────────── */
+:not(.editor-toolbar) .fa,
+:not(.editor-toolbar) .fas,
+:not(.editor-toolbar) .far,
+:not(.editor-toolbar) .fab {
+    font-family: var(--fa-style-family, "Font Awesome 6 Free") !important;
+    font-weight: var(--fa-style, 900) !important;
+}
+</style>
 {% endblock %}
 
 {% block header %}
@@ -119,7 +129,7 @@
 {% endblock %}
 
 {% block script %}
-<script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+<script src="/admin/statics/js/easymde.min.js"></script>
 <script>
 window.postDescriptionEditor = new EasyMDE({
     element: document.querySelector('textarea[name="description"]'),

@@ -17,7 +17,7 @@ class AIProvider(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     provider_type: Mapped[ProviderType] = mapped_column(
-        Enum(ProviderType), nullable=False
+        Enum(ProviderType, native_enum=False), nullable=False
     )
 
     # Основной секрет: API key (OpenAI) или Authorization key (GigaChat)
