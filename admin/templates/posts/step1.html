@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block head_css %}
-<link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+<link rel="stylesheet" href="/admin/statics/css/easymde.min.css">
 <style>
 /* ── Restore Font Awesome 6 overridden by EasyMDE (FA4) ────────────────── */
 :not(.editor-toolbar) .fa,
@@ -187,7 +187,7 @@
 {% endblock %}
 
 {% block script %}
-<script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+<script src="/admin/statics/js/easymde.min.js"></script>
 <script>
 window.postDescriptionEditor = new EasyMDE({
     element: document.querySelector('textarea[name="description"]'),
