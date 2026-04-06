@@ -177,7 +177,7 @@
                         <div class="flex-fill overflow-hidden">
                             <div class="text-body text-truncate small fw-medium">{{ ch.title }}</div>
                             <div class="text-muted" style="font-size:.75rem;">
-                                {{ ch.published_at.strftime('%d.%m %H:%M') if ch.published_at else '—' }}
+                                {% if ch.published_at %}<span data-utc="{{ ch.published_at.isoformat() }}">{{ ch.published_at.strftime('%d.%m %H:%M') }}</span>{% else %}—{% endif %}
                             </div>
                         </div>
                     </div>

@@ -268,6 +268,35 @@
 <script type="text/javascript" src="{{ url_for(__name__ ~ ':statics', path='js/vendor/tabler.min-1.1.0.js') }}"></script>
 {% block script %}{% endblock %}
 <script>
+    /* Конвертация UTC дат из data-utc атрибутов в локальное время пользователя */
+    (function () {
+        function parseUTC(iso) {
+            // Обрезаем микросекунды (Python isoformat может вернуть .123456)
+            var s = iso.replace(/(\.\d{3})\d+/, '$1');
+            if (s.indexOf('Z') === -1 && s.indexOf('+') === -1) s += 'Z';
+            return new Date(s);
+        }
+        function pad(n) { return String(n).padStart(2, '0'); }
+        document.querySelectorAll('[data-utc]').forEach(function (el) {
+            var utc = el.dataset.utc;
+            if (!utc) return;
+            var d = parseUTC(utc);
+            if (isNaN(d.getTime())) return; // невалидная дата — не трогаем элемент
+            var fmt = el.dataset.fmt || 'datetime';
+            if (el.tagName === 'INPUT' && el.type === 'datetime-local') {
+                el.value = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
+                         + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            } else if (fmt === 'date') {
+                el.textContent = pad(d.getDate()) + '.' + pad(d.getMonth()+1) + '.' + d.getFullYear();
+            } else if (fmt === 'time') {
+                el.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
+            } else {
+                el.textContent = pad(d.getDate()) + '.' + pad(d.getMonth()+1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            }
+        });
+    })();
+</script>
+<script>
     $(function () {
         $(".language-switcher-item").each(function () {
             let el = $(this);
