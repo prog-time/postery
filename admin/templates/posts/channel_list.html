@@ -177,9 +177,9 @@
 
                                                 {# Дата #}
                                                 <span class="ch-date">
-                                                    {% if ch.published_at %}{{ ch.published_at.strftime('%d.%m %H:%M') }}
-                                                    {% elif ch.scheduled_at %}{{ ch.scheduled_at.strftime('%d.%m %H:%M') }}
-                                                    {% else %}—{% endif %}
+                                                    {% if ch.published_at %}<span data-utc="{{ ch.published_at.isoformat() }}">{{ ch.published_at.strftime('%d.%m %H:%M') }}</span>
+                                                    {% elif ch.scheduled_at %}<span data-utc="{{ ch.scheduled_at.isoformat() }}">{{ ch.scheduled_at.strftime('%d.%m %H:%M') }}</span>
+                                                    {% else %}<span data-utc="{{ post.post_created.isoformat() }}">{{ post.post_created.strftime('%d.%m %H:%M') }}</span>{% endif %}
                                                 </span>
                                             </a>
                                             {# Действия канала #}
@@ -218,8 +218,8 @@
 
                                 {# Создан #}
                                 <td class="text-muted align-top" style="font-size:.82rem;padding-top:.85rem;">
-                                    {{ post.post_created.strftime('%d.%m.%Y') }}<br>
-                                    <span style="font-size:.75rem;">{{ post.post_created.strftime('%H:%M') }}</span>
+                                    <span data-utc="{{ post.post_created.isoformat() }}" data-fmt="date">{{ post.post_created.strftime('%d.%m.%Y') }}</span><br>
+                                    <span data-utc="{{ post.post_created.isoformat() }}" data-fmt="time" style="font-size:.75rem;">{{ post.post_created.strftime('%H:%M') }}</span>
                                 </td>
 
                                 {# Действия поста #}
@@ -659,25 +659,25 @@
         submitBtn.addEventListener('click', async () => {
             errorEl.style.display = 'none';
             const inputs = datesList.querySelectorAll('.rp-date-input');
-            // Конвертируем локальное время в UTC перед отправкой на сервер
-            const dates  = [...inputs]
-                .map(i => i.value)
-                .filter(Boolean)
-                .map(v => new Date(v).toISOString().slice(0, 16));
+            const rawValues = [...inputs].map(i => i.value).filter(Boolean);
 
-            if (!dates.length) {
+            if (!rawValues.length) {
                 errorEl.textContent = 'Укажите хотя бы одну дату';
                 errorEl.style.display = 'block';
                 return;
             }
 
+            // Проверяем прошедшие даты по локальному времени (до конвертации в UTC)
             const now = new Date();
-            const past = dates.filter(d => new Date(d) <= now);
+            const past = rawValues.filter(v => new Date(v) <= now);
             if (past.length) {
                 errorEl.textContent = 'Одна или несколько дат уже прошли — укажите будущее время';
                 errorEl.style.display = 'block';
                 return;
             }
+
+            // Конвертируем локальное время в UTC перед отправкой на сервер
+            const dates = rawValues.map(v => new Date(v).toISOString().slice(0, 16));
 
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Сохраняем…';
