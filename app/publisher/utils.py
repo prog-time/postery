@@ -7,6 +7,28 @@ _md_to_html = mistune.create_markdown(
     escape=False,
 )
 
+# Теги, которые Telegram поддерживает в parse_mode=HTML
+_TG_ALLOWED = re.compile(
+    r"</?(?!(?:b|strong|i|em|u|ins|s|strike|del|code|pre|a|blockquote|tg-spoiler)(?=[\s>/]))(?:[a-z][a-z0-9]*)(?:\s[^>]*)?>",
+    re.IGNORECASE,
+)
+
+
+def _html_to_tg(html: str) -> str:
+    """Конвертирует стандартный HTML (от mistune) в Telegram-совместимый."""
+    html = re.sub(r"<br\s*/?>", "\n", html, flags=re.IGNORECASE)
+    html = re.sub(r"<h[1-6][^>]*>(.*?)</h[1-6]>", r"<b>\1</b>\n", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r"<li[^>]*>(.*?)</li>", r"• \1\n", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r"</?(?:ul|ol)[^>]*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<p[^>]*>(.*?)</p>", r"\1\n\n", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r"<strong>", "<b>", html, flags=re.IGNORECASE)
+    html = re.sub(r"</strong>", "</b>", html, flags=re.IGNORECASE)
+    html = re.sub(r"<em>", "<i>", html, flags=re.IGNORECASE)
+    html = re.sub(r"</em>", "</i>", html, flags=re.IGNORECASE)
+    html = _TG_ALLOWED.sub("", html)
+    html = re.sub(r"\n{3,}", "\n\n", html)
+    return html.strip()
+
 
 def _md_to_plain(md: str) -> str:
     """Конвертирует markdown в plain text (strip всех HTML-тегов)."""
@@ -41,8 +63,8 @@ def build_text(channel, post, bold_title: bool = True) -> str:
         parts.append(f"<b>{title}</b>" if bold_title else title)
     if description:
         if bold_title:
-            # Telegram: markdown → HTML
-            converted = _md_to_html(description).strip()
+            # Telegram: markdown → Telegram-совместимый HTML
+            converted = _html_to_tg(_md_to_html(description))
         else:
             # VK / MAX: markdown → plain text
             converted = _md_to_plain(description)
