@@ -1,6 +1,6 @@
 from math import ceil
 
-from sqlalchemy import or_
+from sqlalchemy import or_, func, select
 from sqlalchemy.orm import joinedload
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
@@ -92,7 +92,18 @@ class PostChannelListView(CustomView):
             for s in sorted(mx.values(), key=lambda x: x.name):
                 source_options.append({"value": f"max:{s.id}", "label": s.name, "type": "MAX"})
 
-            q = db.query(Post).options(joinedload(Post.channels)).order_by(Post.created_at.desc())
+            latest_pub = (
+                select(PostChannel.post_id,
+                       func.max(PostChannel.published_at).label("latest_published_at"))
+                .group_by(PostChannel.post_id)
+                .subquery()
+            )
+            q = (
+                db.query(Post)
+                .options(joinedload(Post.channels))
+                .outerjoin(latest_pub, Post.id == latest_pub.c.post_id)
+                .order_by(latest_pub.c.latest_published_at.desc().nullslast(), Post.created_at.desc())
+            )
             if search:
                 q = q.filter(Post.title.ilike(f"%{search}%"))
             if filter_status:
