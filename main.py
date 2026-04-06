@@ -86,6 +86,17 @@ limiter = Limiter(key_func=get_remote_address)
 
 def _migrate() -> None:
     """Добавляет колонки, отсутствующие в уже существующих таблицах."""
+    import sqlalchemy as sa
+    from sqlalchemy import inspect as sa_inspect
+
+    is_pg = engine.dialect.name == "postgresql"
+
+    def _bool_default(val: int) -> str:
+        return f"BOOLEAN NOT NULL DEFAULT {'TRUE' if val else 'FALSE'}" if is_pg else f"BOOLEAN NOT NULL DEFAULT {val}"
+
+    def _datetime_type() -> str:
+        return "TIMESTAMP" if is_pg else "DATETIME"
+
     migrations = [
         ("telegram_sources", "ai_prompt_title",       "TEXT"),
         ("telegram_sources", "ai_prompt_description", "TEXT"),
@@ -95,30 +106,70 @@ def _migrate() -> None:
         ("max_sources",      "ai_prompt_description", "TEXT"),
         # TASK-002: retry mechanism
         ("post_channels",    "attempt",               "INTEGER NOT NULL DEFAULT 0"),
-        ("post_channels",    "retry_after",           "DATETIME"),
+        ("post_channels",    "retry_after",           _datetime_type()),
         # TASK-008: auto-generate flag on sources
-        ("telegram_sources", "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
-        ("vk_sources",       "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
-        ("max_sources",      "auto_generate",         "BOOLEAN NOT NULL DEFAULT 0"),
+        ("telegram_sources", "auto_generate",         _bool_default(0)),
+        ("vk_sources",       "auto_generate",         _bool_default(0)),
+        ("max_sources",      "auto_generate",         _bool_default(0)),
         # BASE-PROMPT: global base system prompt per AI provider
         ("ai_providers",     "base_prompt",           "TEXT"),
     ]
+    inspector = sa_inspect(engine)
     with engine.connect() as conn:
         for table, column, col_type in migrations:
-            rows = conn.execute(
-                __import__("sqlalchemy").text(f"PRAGMA table_info({table})")
-            ).fetchall()
-            existing = {r[1] for r in rows}
+            try:
+                existing = {col["name"] for col in inspector.get_columns(table)}
+            except Exception:
+                continue  # таблица ещё не создана
             if column not in existing:
-                conn.execute(
-                    __import__("sqlalchemy").text(
-                        f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
-                    )
-                )
+                conn.execute(sa.text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
                 conn.commit()
 
 
 _migrate()
+
+
+def _migrate_scheduled_at_to_utc() -> None:
+    """Однократно конвертирует scheduled_at из московского времени (UTC+3) в UTC.
+
+    До введения UTC-фикса браузер отправлял локальное время без конвертации,
+    и оно хранилось как есть. После фикса воркер сравнивает с datetime.utcnow(),
+    поэтому старые записи публикуются на 3 часа позже ожидаемого.
+
+    Условие идемпотентности: колонка scheduled_at_utc_migrated отсутствует в
+    таблице настроек → выполняем конвертацию и ставим флаг.
+    """
+    import sqlalchemy as sa
+    from sqlalchemy import inspect as sa_inspect
+
+    inspector = sa_inspect(engine)
+    try:
+        existing = {col["name"] for col in inspector.get_columns("post_channels")}
+    except Exception:
+        return  # таблица ещё не создана
+
+    if "scheduled_at_utc_migrated" in existing:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    with engine.connect() as conn:
+        # Конвертация UTC применима только к SQLite: там старые записи хранились
+        # в московском времени (UTC+3). На PostgreSQL подобных данных нет.
+        if not is_pg:
+            conn.execute(sa.text(
+                "UPDATE post_channels "
+                "SET scheduled_at = datetime(scheduled_at, '-3 hours') "
+                "WHERE status = 'pending' AND scheduled_at IS NOT NULL"
+            ))
+        # Флаг идемпотентности — при следующем старте функция вернётся раньше
+        conn.execute(sa.text(
+            "ALTER TABLE post_channels "
+            "ADD COLUMN scheduled_at_utc_migrated INTEGER NOT NULL DEFAULT 1"
+        ))
+        conn.commit()
+
+
+_migrate_scheduled_at_to_utc()
 
 
 def _backfill_post_images() -> None:
@@ -139,6 +190,14 @@ def _backfill_post_images() -> None:
             try:
                 post_id = int(post_dir.name)
             except ValueError:
+                continue
+
+            # Проверяем, что пост существует в БД (папка могла остаться от старой БД)
+            post_exists = db.execute(
+                sa.text("SELECT COUNT(*) FROM posts WHERE id = :pid"),
+                {"pid": post_id},
+            ).scalar()
+            if not post_exists:
                 continue
 
             existing = db.execute(
