@@ -92,6 +92,7 @@
                 <div class="mb-0">
                     <label class="form-label">Дата и время публикации</label>
                     <input type="datetime-local" name="scheduled_at" class="form-control"
+                           {% if channel.scheduled_at %}data-utc="{{ channel.scheduled_at.isoformat() }}"{% endif %}
                            value="{{ channel.scheduled_at.strftime('%Y-%m-%dT%H:%M') if channel.scheduled_at else '' }}">
                     <div class="form-hint">Оставьте пустым — публикация сразу после нажатия «Готово»</div>
                 </div>
