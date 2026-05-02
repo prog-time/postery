@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 from app.publisher import telegram as tg_publisher
 from app.publisher import vk as vk_publisher
+from app.publisher import webhook as webhook_publisher
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +30,21 @@ def make_tg_source(bot_token="testtoken123", chat_id="-100999888777", thread_id=
 
 def make_vk_source(access_token="vk-token-123", group_id=123456):
     return SimpleNamespace(access_token=access_token, group_id=group_id)
+
+
+def make_webhook_source(webhook_url="https://example.com/hook", secret=None):
+    src = SimpleNamespace(
+        id=1,
+        webhook_url=webhook_url,
+        secret=secret,
+    )
+    src._channel_context = {
+        "post_id": 42,
+        "title": "Test Post",
+        "description": "Test description",
+        "tags": "тег1, тег2",
+    }
+    return src
 
 
 TG_API_BASE = "https://api.telegram.org/bot"
@@ -195,3 +211,147 @@ async def test_vk_http_error_returns_false_not_raises():
     assert success is False
     assert isinstance(error, str)
     assert len(error) > 0
+
+
+# ===========================================================================
+# WEBHOOK TESTS
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Тест W1: webhook.publish() при 2xx возвращает (True, None)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_2xx_returns_success():
+    """При HTTP 2xx должен возвращать (True, None)."""
+    source = make_webhook_source()
+
+    respx.post("https://example.com/hook").mock(
+        return_value=httpx.Response(200, json={"status": "ok"})
+    )
+
+    success, error = await webhook_publisher.publish("text", source, image_paths=[])
+
+    assert success is True
+    assert error is None
+
+
+# ---------------------------------------------------------------------------
+# Тест W2: webhook.publish() при не-2xx возвращает (False, str с кодом)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_non_2xx_returns_false():
+    """При HTTP не-2xx должен возвращать (False, str), не бросать исключение."""
+    source = make_webhook_source()
+
+    respx.post("https://example.com/hook").mock(
+        return_value=httpx.Response(404, text="Not Found")
+    )
+
+    success, error = await webhook_publisher.publish("text", source, image_paths=[])
+
+    assert success is False
+    assert isinstance(error, str)
+    assert "404" in error
+
+
+# ---------------------------------------------------------------------------
+# Тест W3: webhook.publish() при таймауте возвращает (False, str), не кидает
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_timeout_returns_false():
+    """При таймауте должен возвращать (False, str), а не бросать исключение."""
+    source = make_webhook_source()
+
+    respx.post("https://example.com/hook").mock(
+        side_effect=httpx.TimeoutException("timeout")
+    )
+
+    success, error = await webhook_publisher.publish("text", source, image_paths=[])
+
+    assert success is False
+    assert isinstance(error, str)
+    assert "timeout" in error.lower()
+
+
+# ---------------------------------------------------------------------------
+# Тест W4: webhook.publish() с секретом добавляет X-Postery-Signature
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_with_secret_adds_signature():
+    """При заданном secret запрос должен содержать X-Postery-Signature."""
+    source = make_webhook_source(secret="my-secret")
+
+    captured_headers = {}
+
+    def capture(request, *args, **kwargs):
+        captured_headers.update(dict(request.headers))
+        return httpx.Response(200, json={"ok": True})
+
+    respx.post("https://example.com/hook").mock(side_effect=capture)
+
+    success, error = await webhook_publisher.publish("text", source, image_paths=[])
+
+    assert success is True
+    sig_header = captured_headers.get("x-postery-signature", "")
+    assert sig_header.startswith("sha256="), f"Expected sha256= prefix, got: {sig_header!r}"
+
+
+# ---------------------------------------------------------------------------
+# Тест W5: webhook.publish() без секрета НЕ добавляет X-Postery-Signature
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_without_secret_no_signature():
+    """Без секрета заголовок X-Postery-Signature не должен присутствовать."""
+    source = make_webhook_source(secret=None)
+
+    captured_headers = {}
+
+    def capture(request, *args, **kwargs):
+        captured_headers.update(dict(request.headers))
+        return httpx.Response(200, json={"ok": True})
+
+    respx.post("https://example.com/hook").mock(side_effect=capture)
+
+    await webhook_publisher.publish("text", source, image_paths=[])
+
+    assert "x-postery-signature" not in captured_headers
+
+
+# ---------------------------------------------------------------------------
+# Тест W6: payload содержит ожидаемые поля
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_payload_structure():
+    """Payload должен содержать все обязательные поля (Issue #4 spec)."""
+    import json as _json
+    source = make_webhook_source()
+
+    captured_body = {}
+
+    def capture(request, *args, **kwargs):
+        captured_body["data"] = _json.loads(request.content)
+        return httpx.Response(200)
+
+    respx.post("https://example.com/hook").mock(side_effect=capture)
+
+    await webhook_publisher.publish("text", source, image_paths=[])
+
+    payload = captured_body["data"]
+    for field in ("post_id", "source_id", "title", "description", "tags", "published_at", "image_urls"):
+        assert field in payload, f"Missing field: {field}"
+    assert payload["source_id"] == 1
+    assert payload["post_id"] == 42
+    assert isinstance(payload["tags"], list)
+    assert isinstance(payload["image_urls"], list)
