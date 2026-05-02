@@ -5,6 +5,50 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/source", tags=["source"])
 
 
+# ── Webhook ───────────────────────────────────────────────────────────────────
+
+class WebhookTestRequest(BaseModel):
+    webhook_url: str
+
+
+@router.post("/webhook/test")
+async def test_webhook(body: WebhookTestRequest):
+    return await _test_webhook(body.webhook_url)
+
+
+async def _test_webhook(webhook_url: str) -> dict:
+    """Отправляет тестовый POST на указанный URL. Успех — любой HTTP 2xx."""
+    import re
+    if not re.match(r"^https?://", webhook_url, re.IGNORECASE):
+        return {"ok": False, "error": "URL должен начинаться с http:// или https://"}
+
+    stub_payload = {
+        "post_id": None,
+        "source_id": None,
+        "title": "Postery test",
+        "description": "This is a test ping from Postery.",
+        "tags": [],
+        "published_at": None,
+        "image_urls": [],
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                webhook_url,
+                json=stub_payload,
+                headers={"Content-Type": "application/json"},
+            )
+        if resp.is_success:
+            return {"ok": True, "message": f"Подключение успешно (HTTP {resp.status_code})"}
+        else:
+            truncated = resp.text[:200]
+            return {"ok": False, "error": f"Сервер вернул HTTP {resp.status_code}: {truncated}"}
+    except httpx.TimeoutException:
+        return {"ok": False, "error": "Превышено время ожидания (30 с)"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ── VK ────────────────────────────────────────────────────────────────────────
 
 class VKTestRequest(BaseModel):
