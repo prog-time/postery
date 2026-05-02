@@ -1,0 +1,59 @@
+{# Поля формы Webhook — используется в tab-params и в режиме создания #}
+
+{# Название #}
+<div class="mb-3">
+    <label class="form-label required">Название</label>
+    <input type="text" name="name"
+           class="form-control {% if errors.name %}is-invalid{% endif %}"
+           value="{{ form.name if form.name is defined else (source.name if editing else '') }}"
+           placeholder="Блог WordPress">
+    {% if errors.name %}
+        <div class="invalid-feedback">{{ errors.name }}</div>
+    {% endif %}
+    <small class="form-hint">Понятное имя источника, например: Блог WordPress</small>
+</div>
+
+{# Webhook URL #}
+<div class="mb-3">
+    <label class="form-label required">Webhook URL</label>
+    <input type="url" name="webhook_url"
+           class="form-control {% if errors.webhook_url %}is-invalid{% endif %}"
+           value="{{ form.webhook_url if form.webhook_url is defined else (source.webhook_url if editing else '') }}"
+           placeholder="https://example.com/webhook/postery">
+    {% if errors.webhook_url %}
+        <div class="invalid-feedback">{{ errors.webhook_url }}</div>
+    {% endif %}
+    <small class="form-hint">URL для приёма HTTP POST-запросов. Должен начинаться с http:// или https://</small>
+</div>
+
+{# Secret (HMAC) #}
+<div class="mb-3">
+    <label class="form-label">Секрет <span class="text-muted">(необязательно)</span></label>
+    <input type="password" name="secret"
+           class="form-control"
+           placeholder="{{ 'Оставьте пустым, чтобы не менять' if editing else 'Секретная фраза для подписи' }}"
+           autocomplete="off">
+    <small class="form-hint">
+        {% if editing %}
+            Введите новый секрет для замены или оставьте поле пустым
+        {% else %}
+            Если задан — каждый запрос будет содержать заголовок <code>X-Postery-Signature: sha256=&lt;hmac&gt;</code>
+        {% endif %}
+    </small>
+</div>
+
+{# Is Active #}
+<div class="mb-3">
+    <label class="form-check">
+        <input type="checkbox" name="is_active" class="form-check-input"
+               {% if form.get('is_active') == 'on' %}checked
+               {% elif not form and editing and source.is_active %}checked
+               {% endif %}>
+        <span class="form-check-label">Активен</span>
+    </label>
+</div>
+
+{# Test status #}
+<div id="wh-test-status" style="display:none;">
+    <div id="wh-test-msg" class="alert mb-0" style="display:flex;align-items:center;gap:5px;"></div>
+</div>
