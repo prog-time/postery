@@ -213,7 +213,43 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 
 ---
 
-### 2.7 Delete Post Image
+### 2.7 Webhook Source Connection Test
+
+```
+POST /api/source/webhook/test
+```
+
+Router: `app/routers/source.py` (prefix `/api/source`)
+
+**Request body (JSON):**
+```json
+{
+  "webhook_url": "string"   // must start with http:// or https://
+}
+```
+
+**Success response:**
+```json
+{"ok": true, "message": "Подключение успешно (HTTP 200)"}
+```
+
+**Error response:**
+```json
+{"ok": false, "error": "..."}
+```
+
+**Timeouts:** 30 s (matching Webhook publisher).
+
+**Side effects:** None — sends a stub POST to the provided URL but does not write to the DB.
+
+**Notes:**
+- Sends a minimal stub payload `{"post_id": null, "source_id": null, "title": "Postery test", ...}` via `POST`
+- Any HTTP 2xx response is considered success
+- URL validation: must start with `http://` or `https://`; returns `{"ok": false, "error": "..."}` if not
+
+---
+
+### 2.8 Delete Post Image
 
 ```
 DELETE /api/posts/image/{image_id}
@@ -285,6 +321,8 @@ Do not add REST logic to admin view `render()` methods. Keep admin views as rend
 | VK wizard | `GET/POST /admin/vk-source/wizard` | CustomView |
 | MAX source list | `GET /admin/m-a-x-source/list` | ModelView |
 | MAX wizard | `GET/POST /admin/max-source/wizard` | CustomView |
+| Webhook source list | `GET /admin/webhook-source/list` | ModelView |
+| Webhook wizard | `GET/POST /admin/webhook-source/wizard` | CustomView |
 | AI provider list | `GET /admin/ai-provider/list` | ModelView |
 | AI provider wizard | `GET/POST /admin/ai-provider/wizard` | CustomView |
 | Admin users | `GET /admin/admin-user/list` | ModelView |
