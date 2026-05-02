@@ -51,7 +51,7 @@ _Enforced in:_ `app/worker.py @ _publish_channel()`
 _Enforced in:_ `app/worker.py @ _publish_channel()` (post-flush check)
 
 **BR-008** — Every publisher module must implement `async def publish(text, source, image_paths) -> tuple[bool, str | None]`. Return `(True, None)` on success, `(False, "error")` on failure. Never raise from `publish()`.
-_Enforced in:_ `app/publisher/telegram.py`, `app/publisher/vk.py`, `app/publisher/max_messenger.py`
+_Enforced in:_ `app/publisher/telegram.py`, `app/publisher/vk.py`, `app/publisher/max_messenger.py`, `app/publisher/webhook.py`
 
 **BR-009** — All ORM data needed by the publisher must be loaded before the first `await`. Publishers receive plain values, not ORM objects tied to a session.
 _Enforced in:_ `app/worker.py @ _publish_channel()` (builds `image_paths`, `text_html`, `text_plain` before calling publishers)
@@ -135,6 +135,28 @@ async def publish(text, source, image_paths):
 - **Text format:** plain text
 - **Photo upload flow:** `POST /uploads?type=image` → get `url` → POST file → extract `token` → attach as `{"type": "image", "payload": {"token": "..."}}`
 - **Message body:** `{"recipient": {"chat_id": id}, "type": "text", "text": "...", "attachments": [...]}`
+
+### 6.4 Webhook (Issue #4)
+
+- **Publisher:** `app/publisher/webhook.py`
+- **Method:** `POST` with `Content-Type: application/json`
+- **Timeout:** 30 seconds
+- **Success:** HTTP 2xx; anything else → `(False, "Webhook HTTP {status}: {body[:500]}")`
+- **Auth:** Optional HMAC-SHA256; when `source.secret` is set, the request carries `X-Postery-Signature: sha256=<hex>` over the raw JSON body bytes
+- **Payload fields (fixed):**
+  ```json
+  {
+    "post_id":      42,
+    "source_id":    1,
+    "title":        "Post title",
+    "description":  "Post description or null",
+    "tags":         ["tag1", "tag2"],
+    "published_at": "2026-05-02T10:30:00+00:00",
+    "image_urls":   ["/data/uploads/42/photo.jpg"]
+  }
+  ```
+- **Context injection:** Worker sets `source._channel_context = {post_id, title, description, tags}` before calling `publish()`
+- **SSRF hardening:** out of scope — tracked as follow-up
 
 ---
 
