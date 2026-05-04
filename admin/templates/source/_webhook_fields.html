@@ -26,6 +26,17 @@
     <small class="form-hint">URL для приёма HTTP POST-запросов. Должен начинаться с http:// или https://</small>
 </div>
 
+{# Confirmation code info block #}
+<div class="mb-3 alert alert-info py-2">
+    <strong>Подтверждение адреса сервера</strong>
+    <p class="mb-1 mt-1 small">
+        Чтобы Postery мог проверить ваш адрес, сервер должен на POST-запрос
+        с телом <code>{"type":"confirmation"}</code> ответить plain-text строкой:
+    </p>
+    <code>{{ confirmation_code if confirmation_code else "введите URL — код появится после сохранения" }}</code>
+    <p class="mb-0 mt-1 small text-muted">Код обновляется раз в сутки и зависит от URL.</p>
+</div>
+
 {# Secret (HMAC) #}
 <div class="mb-3">
     <label class="form-label">Секрет <span class="text-muted">(необязательно)</span></label>

@@ -115,7 +115,7 @@
             if (result.ok) {
                 showMsg(true, result.message || 'Подключение успешно');
             } else {
-                showMsg(false, result.error || 'Ошибка подключения');
+                showMsg(false, result.message || 'Ошибка подключения');
             }
         } catch (e) {
             showMsg(false, 'Ошибка запроса: ' + e.message);

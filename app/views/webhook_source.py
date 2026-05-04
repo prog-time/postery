@@ -8,6 +8,7 @@ from starlette_admin.views import CustomView
 
 from app.database import SessionLocal
 from app.models import WebhookSource
+from app.publisher.webhook import confirmation_code as _confirmation_code
 
 log_audit = logging.getLogger("admin.audit")
 
@@ -42,16 +43,28 @@ class WebhookSourceWizardView(CustomView):
     def _render(self, request, templates, wizard_url,
                 source=None, errors=None, form=None):
         editing = source is not None
+
+        # Вычисляем код подтверждения для отображения в UI.
+        # Приоритет: данные формы (если есть ошибка и форма перерендерится),
+        # затем сохранённые данные источника, иначе None.
+        url_for_code = (
+            (form or {}).get("webhook_url")
+            or (source or {}).get("webhook_url")
+            or ""
+        )
+        code = _confirmation_code(url_for_code) if url_for_code else None
+
         return templates.TemplateResponse(
             request=request,
             name="source/webhook.html",
             context={
-                "wizard_url": wizard_url,
-                "list_url":   _LIST_URL,
-                "editing":    editing,
-                "source":     source,
-                "errors":     errors or {},
-                "form":       form or {},
+                "wizard_url":        wizard_url,
+                "list_url":          _LIST_URL,
+                "editing":           editing,
+                "source":            source,
+                "errors":            errors or {},
+                "form":              form or {},
+                "confirmation_code": code,
             },
         )
 
