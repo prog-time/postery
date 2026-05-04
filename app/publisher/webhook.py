@@ -3,7 +3,8 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime, timezone
+import os
+from datetime import date, datetime, timezone
 
 import httpx
 
@@ -12,14 +13,32 @@ log = logging.getLogger("publisher.webhook")
 _TIMEOUT = 30  # секунд — аналогично Telegram-publisher
 
 
+def confirmation_code(webhook_url: str) -> str:
+    """Возвращает 8-символьный hex-код подтверждения для заданного URL.
+
+    Код детерминирован: одинаков для одного URL в течение суток и меняется
+    каждый день. Зависит от SECRET_KEY окружения.
+
+    Алгоритм: HMAC-SHA1("<webhook_url>:<YYYY-MM-DD>", SECRET_KEY)[:8]
+    """
+    day = date.today().isoformat()                           # YYYY-MM-DD
+    data = f"{webhook_url}:{day}".encode("utf-8")
+    secret_key = os.environ.get("SECRET_KEY", "")
+    digest = hmac.new(secret_key.encode("utf-8"), data, hashlib.sha1).hexdigest()
+    return digest[:8]
+
+
 async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str | None]:
     """
-    Отправляет фиксированный JSON-payload на webhook_url источника.
+    Отправляет JSON-envelope на webhook_url источника.
 
     text        — готовый plain-текст поста (без HTML-тегов).
     source      — ORM WebhookSource (только простые атрибуты).
     image_paths — абсолютные пути к файлам изображений (используются для
                   формирования публичных URL; сами файлы не передаются).
+
+    Формат envelope:
+      {"type": "publish", "source_id": <int>, "object": { ...поля поста... }}
 
     Контракт:
     - Никогда не бросает исключение наружу.
@@ -34,7 +53,6 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
     # отрезаем всё до "data/uploads".
     image_urls: list[str] = []
     for abs_path in image_paths:
-        # Нормализуем разделители и ищем маркер
         normalized = abs_path.replace("\\", "/")
         marker = "data/uploads/"
         idx = normalized.find(marker)
@@ -44,13 +62,14 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
         else:
             image_urls.append(abs_path)
 
-    # Effective title / description берём из уже подготовленного text.
-    # Дополнительно передаём структурированные поля через source-контекст,
-    # который передаётся снаружи через _publish_channel в worker.py.
-    # Payload строится из атрибутов source, полученных через аргумент.
-    payload = _build_payload(source=source, image_urls=image_urls)
+    obj = _build_object(source=source, image_urls=image_urls)
+    envelope = {
+        "type":      "publish",
+        "source_id": source.id,
+        "object":    obj,
+    }
 
-    body_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    body_bytes = json.dumps(envelope, ensure_ascii=False).encode("utf-8")
 
     headers: dict[str, str] = {"Content-Type": "application/json"}
     if source.secret:
@@ -61,7 +80,10 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
         ).hexdigest()
         headers["X-Postery-Signature"] = f"sha256={sig}"
 
-    log.info("Webhook publish → url=%s payload_keys=%s", url, list(payload.keys()))
+    log.info(
+        "Webhook publish → url=%s type=publish object_keys=%s",
+        url, list(obj.keys()),
+    )
 
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -85,22 +107,19 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
         return False, f"Webhook error: {str(exc)[:500]}"
 
 
-def _build_payload(source, image_urls: list[str]) -> dict:
-    """Формирует фиксированный JSON-payload для webhook-запроса.
+def _build_object(source, image_urls: list[str]) -> dict:
+    """Формирует внутренний object-словарь для envelope publish.
 
-    Поля payload (Issue #4, §Вопросы — принятые defaults):
+    Поля (Issue #4, VK-style envelope):
       post_id        — int, ID поста
-      source_id      — int, ID источника
       title          — str, заголовок (effective_title канала)
       description    — str | null, текст поста (effective_description)
       tags           — list[str], теги (разбитые по запятой, без #)
       published_at   — str (ISO 8601 UTC), время публикации
       image_urls     — list[str], публичные URL /data/uploads/...
+
+    source_id вынесен на уровень envelope, здесь не дублируется.
     """
-    # source здесь — WebhookSource; реальные значения поста/канала
-    # должны быть переданы через расширенный вызов.  Поля поста
-    # инжектируются worker.py через параметр source._channel_context
-    # (см. worker.py — мы задаём временный атрибут перед вызовом publish).
     ctx = getattr(source, "_channel_context", {})
 
     tags_raw = ctx.get("tags") or ""
@@ -108,7 +127,6 @@ def _build_payload(source, image_urls: list[str]) -> dict:
 
     return {
         "post_id":      ctx.get("post_id"),
-        "source_id":    source.id,
         "title":        ctx.get("title"),
         "description":  ctx.get("description"),
         "tags":         tags_list,
