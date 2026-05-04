@@ -27,14 +27,27 @@
 </div>
 
 {# Confirmation code info block #}
-<div class="mb-3 alert alert-info py-2">
-    <strong>Подтверждение адреса сервера</strong>
-    <p class="mb-1 mt-1 small">
-        Чтобы Postery мог проверить ваш адрес, сервер должен на POST-запрос
-        с телом <code>{"type":"confirmation"}</code> ответить plain-text строкой:
+<div class="mb-3 alert alert-info">
+    <div class="fw-bold mb-2">Подтверждение адреса сервера</div>
+    <p class="small mb-2">
+        Чтобы Postery мог проверить ваш адрес, сервер должен на
+        <code>POST</code>-запрос с телом
+        <code>{"type":"confirmation"}</code>
+        вернуть plain-text строкой:
     </p>
-    <code>{{ confirmation_code if confirmation_code else "введите URL — код появится после сохранения" }}</code>
-    <p class="mb-0 mt-1 small text-muted">Код обновляется раз в сутки и зависит от URL.</p>
+    {% if confirmation_code %}
+    <div class="bg-white border rounded p-2 mb-2 text-center"
+         style="user-select:all; cursor:text;">
+        <code class="fs-3 fw-bold text-dark">{{ confirmation_code }}</code>
+    </div>
+    {% else %}
+    <div class="small text-muted fst-italic mb-2">
+        Введите URL — код появится после сохранения.
+    </div>
+    {% endif %}
+    <div class="small text-muted mb-0">
+        Код обновляется раз в сутки и зависит от URL.
+    </div>
 </div>
 
 {# Secret (HMAC) #}
