@@ -16,6 +16,7 @@ from app.models.post import Post, PostImage, PostChannel, PostStatus, ChannelSta
 from app.models.sources.telegram import TelegramSource
 from app.models.sources.vk import VKSource
 from app.models.sources.max_messenger import MAXSource
+from app.models.sources.webhook import WebhookSource
 from app.auth import EditorAccessMixin
 
 
@@ -64,16 +65,20 @@ class PostWizardView(EditorAccessMixin, CustomView):
             tg_sources  = db.query(TelegramSource).filter_by(is_active=True).all()
             vk_sources  = db.query(VKSource).filter_by(is_active=True).all()
             max_sources = db.query(MAXSource).filter_by(is_active=True).all()
+            wh_sources  = db.query(WebhookSource).filter_by(is_active=True).all()
             selected_tg  = {ch.source_id for ch in post.channels if ch.source_type == "telegram"}
             selected_vk  = {ch.source_id for ch in post.channels if ch.source_type == "vk"}
             selected_max = {ch.source_id for ch in post.channels if ch.source_type == "max"}
+            selected_wh  = {ch.source_id for ch in post.channels if ch.source_type == "webhook"}
             return templates.TemplateResponse(
                 request=request,
                 name="posts/step2.html",
                 context={
                     "step": 2, "post": post,
                     "tg_sources": tg_sources, "vk_sources": vk_sources, "max_sources": max_sources,
+                    "wh_sources": wh_sources,
                     "selected_tg": selected_tg, "selected_vk": selected_vk, "selected_max": selected_max,
+                    "selected_wh": selected_wh,
                     "wizard_url": wizard_url,
                 },
             )
@@ -236,21 +241,26 @@ class PostWizardView(EditorAccessMixin, CustomView):
             tg_ids  = [int(x) for x in form.getlist("telegram_sources")]
             vk_ids  = [int(x) for x in form.getlist("vk_sources")]
             max_ids = [int(x) for x in form.getlist("max_sources")]
+            wh_ids  = [int(x) for x in form.getlist("webhook_sources")]
 
-            if not tg_ids and not vk_ids and not max_ids:
+            if not tg_ids and not vk_ids and not max_ids and not wh_ids:
                 tg_sources  = db.query(TelegramSource).filter_by(is_active=True).all()
                 vk_sources  = db.query(VKSource).filter_by(is_active=True).all()
                 max_sources = db.query(MAXSource).filter_by(is_active=True).all()
+                wh_sources  = db.query(WebhookSource).filter_by(is_active=True).all()
                 selected_tg  = {ch.source_id for ch in post.channels if ch.source_type == "telegram"}
                 selected_vk  = {ch.source_id for ch in post.channels if ch.source_type == "vk"}
                 selected_max = {ch.source_id for ch in post.channels if ch.source_type == "max"}
+                selected_wh  = {ch.source_id for ch in post.channels if ch.source_type == "webhook"}
                 return templates.TemplateResponse(
                     request=request,
                     name="posts/step2.html",
                     context={
                         "step": 2, "post": post,
                         "tg_sources": tg_sources, "vk_sources": vk_sources, "max_sources": max_sources,
+                        "wh_sources": wh_sources,
                         "selected_tg": selected_tg, "selected_vk": selected_vk, "selected_max": selected_max,
+                        "selected_wh": selected_wh,
                         "error": "Выберите хотя бы один источник",
                         "wizard_url": wizard_url,
                     },
@@ -267,6 +277,8 @@ class PostWizardView(EditorAccessMixin, CustomView):
                 db.add(PostChannel(post_id=post.id, source_type="vk", source_id=src_id))
             for src_id in max_ids:
                 db.add(PostChannel(post_id=post.id, source_type="max", source_id=src_id))
+            for src_id in wh_ids:
+                db.add(PostChannel(post_id=post.id, source_type="webhook", source_id=src_id))
 
             db.commit()
             db.refresh(post)
@@ -324,6 +336,8 @@ def _resolve_source(db, channel: PostChannel):
         return db.get(VKSource, channel.source_id)
     if channel.source_type == "max":
         return db.get(MAXSource, channel.source_id)
+    if channel.source_type == "webhook":
+        return db.get(WebhookSource, channel.source_id)
     return None
 
 
