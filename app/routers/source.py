@@ -1,8 +1,14 @@
+import re
+
 import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.publisher.webhook import confirmation_code
+
 router = APIRouter(prefix="/api/source", tags=["source"])
+
+_URL_RE = re.compile(r"^https?://", re.IGNORECASE)
 
 
 # ── Webhook ───────────────────────────────────────────────────────────────────
@@ -17,36 +23,36 @@ async def test_webhook(body: WebhookTestRequest):
 
 
 async def _test_webhook(webhook_url: str) -> dict:
-    """Отправляет тестовый POST на указанный URL. Успех — любой HTTP 2xx."""
-    import re
-    if not re.match(r"^https?://", webhook_url, re.IGNORECASE):
-        return {"ok": False, "error": "URL должен начинаться с http:// или https://"}
+    """VK-style handshake: отправляет {"type":"confirmation"} и сверяет ответ.
 
-    stub_payload = {
-        "post_id": None,
-        "source_id": None,
-        "title": "Postery test",
-        "description": "This is a test ping from Postery.",
-        "tags": [],
-        "published_at": None,
-        "image_urls": [],
-    }
+    Всегда возвращает HTTP 200 с телом {"ok": bool, "message": str}.
+    """
+    if not _URL_RE.match(webhook_url):
+        return {"ok": False, "message": "URL должен начинаться с http:// или https://"}
+
+    expected = confirmation_code(webhook_url)
+
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
                 webhook_url,
-                json=stub_payload,
-                headers={"Content-Type": "application/json"},
+                json={"type": "confirmation"},
             )
-        if resp.is_success:
-            return {"ok": True, "message": f"Подключение успешно (HTTP {resp.status_code})"}
-        else:
-            truncated = resp.text[:200]
-            return {"ok": False, "error": f"Сервер вернул HTTP {resp.status_code}: {truncated}"}
     except httpx.TimeoutException:
-        return {"ok": False, "error": "Превышено время ожидания (30 с)"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "message": "Таймаут 30 с"}
+    except Exception as exc:
+        return {"ok": False, "message": f"Ошибка: {str(exc)[:200]}"}
+
+    if not resp.is_success:
+        return {"ok": False, "message": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+
+    actual = resp.text.strip()
+    if actual == expected:
+        return {"ok": True, "message": "Сервер подтвердил адрес"}
+    return {
+        "ok": False,
+        "message": f"Сервер вернул '{actual[:80]}', ожидалось '{expected}'",
+    }
 
 
 # ── VK ────────────────────────────────────────────────────────────────────────
