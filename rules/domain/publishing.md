@@ -142,20 +142,27 @@ async def publish(text, source, image_paths):
 - **Method:** `POST` with `Content-Type: application/json`
 - **Timeout:** 30 seconds
 - **Success:** HTTP 2xx; anything else → `(False, "Webhook HTTP {status}: {body[:500]}")`
-- **Auth:** Optional HMAC-SHA256; when `source.secret` is set, the request carries `X-Postery-Signature: sha256=<hex>` over the raw JSON body bytes
-- **Payload fields (fixed):**
+- **Auth:** Optional HMAC-SHA256; when `source.secret` is set, the request carries `X-Postery-Signature: sha256=<hex>` computed over the **full envelope body bytes**
+- **Envelope format (VK-style, breaking change from initial Issue #4):**
   ```json
   {
-    "post_id":      42,
-    "source_id":    1,
-    "title":        "Post title",
-    "description":  "Post description or null",
-    "tags":         ["tag1", "tag2"],
-    "published_at": "2026-05-02T10:30:00+00:00",
-    "image_urls":   ["/data/uploads/42/photo.jpg"]
+    "type":      "publish",
+    "source_id": 1,
+    "object": {
+      "post_id":      42,
+      "title":        "Post title",
+      "description":  "Post description or null",
+      "tags":         ["tag1", "tag2"],
+      "published_at": "2026-05-02T10:30:00+00:00",
+      "image_urls":   ["/data/uploads/42/photo.jpg"]
+    }
   }
   ```
+  - `source_id` is at the top-level envelope, NOT inside `object`
+  - `object` contains all per-post fields (no `source_id` there)
+  - HMAC signs the full serialised envelope (all bytes), not just `object`
 - **Context injection:** Worker sets `source._channel_context = {post_id, title, description, tags}` before calling `publish()`
+- **Log line:** `Webhook publish → url=... type=publish object_keys=[...]`
 - **SSRF hardening:** out of scope — tracked as follow-up
 
 ---

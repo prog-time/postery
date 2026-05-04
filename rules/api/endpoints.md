@@ -213,7 +213,7 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 
 ---
 
-### 2.7 Webhook Source Connection Test
+### 2.7 Webhook Source Connection Test (VK-style handshake)
 
 ```
 POST /api/source/webhook/test
@@ -228,24 +228,26 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 }
 ```
 
-**Success response:**
-```json
-{"ok": true, "message": "Подключение успешно (HTTP 200)"}
-```
+**All responses are HTTP 200 with `{"ok": bool, "message": str}`:**
 
-**Error response:**
-```json
-{"ok": false, "error": "..."}
-```
+| Outcome | Response |
+|---------|----------|
+| Confirmation matched | `{"ok": true, "message": "Сервер подтвердил адрес"}` |
+| Confirmation mismatched | `{"ok": false, "message": "Сервер вернул '{actual}', ожидалось '{expected}'"}` |
+| Non-2xx response | `{"ok": false, "message": "HTTP {status}: {body[:200]}"}` |
+| Timeout | `{"ok": false, "message": "Таймаут 30 с"}` |
+| Invalid URL | `{"ok": false, "message": "URL должен начинаться с http:// или https://"}` |
+| Network error | `{"ok": false, "message": "Ошибка: {str(exc)[:200]}"}` |
 
 **Timeouts:** 30 s (matching Webhook publisher).
 
-**Side effects:** None — sends a stub POST to the provided URL but does not write to the DB.
+**Side effects:** None — sends confirmation POST to the provided URL, no DB writes.
 
-**Notes:**
-- Sends a minimal stub payload `{"post_id": null, "source_id": null, "title": "Postery test", ...}` via `POST`
-- Any HTTP 2xx response is considered success
-- URL validation: must start with `http://` or `https://`; returns `{"ok": false, "error": "..."}` if not
+**Handshake protocol:**
+1. Compute `expected = confirmation_code(webhook_url)` — 8-char hex, HMAC-SHA1 of `"{url}:{today}"` keyed with `SECRET_KEY`, truncated to 8 chars
+2. POST `{"type": "confirmation"}` (JSON) to `webhook_url`
+3. `.strip()` the response body and compare with `expected`
+4. Code rotates daily; the UI shows the current expected code in the edit/create form
 
 ---
 
