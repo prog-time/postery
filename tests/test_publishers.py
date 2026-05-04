@@ -328,13 +328,13 @@ async def test_webhook_without_secret_no_signature():
 
 
 # ---------------------------------------------------------------------------
-# Тест W6: payload содержит ожидаемые поля
+# Тест W6: envelope содержит ожидаемые ключи (VK-style, breaking change)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 @respx.mock
 async def test_webhook_payload_structure():
-    """Payload должен содержать все обязательные поля (Issue #4 spec)."""
+    """Envelope должен иметь ключи type/source_id/object, type=='publish'."""
     import json as _json
     source = make_webhook_source()
 
@@ -348,10 +348,191 @@ async def test_webhook_payload_structure():
 
     await webhook_publisher.publish("text", source, image_paths=[])
 
-    payload = captured_body["data"]
-    for field in ("post_id", "source_id", "title", "description", "tags", "published_at", "image_urls"):
-        assert field in payload, f"Missing field: {field}"
-    assert payload["source_id"] == 1
-    assert payload["post_id"] == 42
-    assert isinstance(payload["tags"], list)
-    assert isinstance(payload["image_urls"], list)
+    envelope = captured_body["data"]
+    # Верхний уровень — envelope
+    for key in ("type", "source_id", "object"):
+        assert key in envelope, f"Missing envelope key: {key}"
+    assert envelope["type"] == "publish"
+    assert envelope["source_id"] == 1
+
+    # object содержит поля поста
+    obj = envelope["object"]
+    for field in ("post_id", "title", "description", "tags", "published_at", "image_urls"):
+        assert field in obj, f"Missing object field: {field}"
+    assert obj["post_id"] == 42
+    assert isinstance(obj["tags"], list)
+    assert isinstance(obj["image_urls"], list)
+    # source_id не должен дублироваться внутри object
+    assert "source_id" not in obj
+
+
+# ===========================================================================
+# WEBHOOK CONFIRMATION CODE TESTS
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Тест C1: confirmation_code детерминирован для одного URL+дня
+# ---------------------------------------------------------------------------
+
+def test_confirmation_code_deterministic():
+    """Один и тот же URL в один день даёт один и тот же код."""
+    from app.publisher.webhook import confirmation_code
+    code1 = confirmation_code("https://example.com/hook")
+    code2 = confirmation_code("https://example.com/hook")
+    assert code1 == code2
+
+
+# ---------------------------------------------------------------------------
+# Тест C2: разные URL дают разные коды
+# ---------------------------------------------------------------------------
+
+def test_confirmation_code_different_urls():
+    """Разные URL дают разные коды."""
+    from app.publisher.webhook import confirmation_code
+    code_a = confirmation_code("https://example.com/hook")
+    code_b = confirmation_code("https://other.example.com/hook")
+    assert code_a != code_b
+
+
+# ---------------------------------------------------------------------------
+# Тест C3: длина кода ровно 8, только hex-символы
+# ---------------------------------------------------------------------------
+
+def test_confirmation_code_format():
+    """Код должен быть ровно 8 символов и состоять из hex-цифр."""
+    from app.publisher.webhook import confirmation_code
+    code = confirmation_code("https://example.com/hook")
+    assert len(code) == 8
+    assert all(c in "0123456789abcdef" for c in code)
+
+
+# ---------------------------------------------------------------------------
+# Тест C4: код меняется при смене дня (мокаем date.today)
+# ---------------------------------------------------------------------------
+
+def test_confirmation_code_rotates_daily():
+    """Код для одного URL должен различаться в разные дни."""
+    from unittest.mock import patch
+    from datetime import date
+    from app.publisher.webhook import confirmation_code
+
+    url = "https://example.com/hook"
+
+    with patch("app.publisher.webhook.date") as mock_date:
+        mock_date.today.return_value = date(2026, 5, 1)
+        code_day1 = confirmation_code(url)
+
+    with patch("app.publisher.webhook.date") as mock_date:
+        mock_date.today.return_value = date(2026, 5, 2)
+        code_day2 = confirmation_code(url)
+
+    assert code_day1 != code_day2
+
+
+# ===========================================================================
+# WEBHOOK TEST-ENDPOINT TESTS
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Тест E1: совпадение — возвращает {ok: true}
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_test_endpoint_match():
+    """Если сервер вернул ожидаемый код — ok=True."""
+    from unittest.mock import patch
+    from datetime import date
+    from app.routers.source import _test_webhook
+
+    url = "https://example.com/hook"
+
+    # Фиксируем дату для предсказуемого кода
+    with patch("app.publisher.webhook.date") as mock_date:
+        mock_date.today.return_value = date(2026, 5, 1)
+        from app.publisher.webhook import confirmation_code
+        expected = confirmation_code(url)
+
+        respx.post(url).mock(return_value=httpx.Response(200, text=expected))
+
+        result = await _test_webhook(url)
+
+    assert result["ok"] is True
+    assert "подтвердил" in result["message"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Тест E2: несовпадение — возвращает {ok: false} с обоими кодами в message
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_test_endpoint_mismatch():
+    """Если сервер вернул неверный код — ok=False с описанием."""
+    from unittest.mock import patch
+    from datetime import date
+    from app.routers.source import _test_webhook
+
+    url = "https://example.com/hook"
+
+    with patch("app.publisher.webhook.date") as mock_date:
+        mock_date.today.return_value = date(2026, 5, 1)
+
+        respx.post(url).mock(return_value=httpx.Response(200, text="wrong123"))
+        result = await _test_webhook(url)
+
+    assert result["ok"] is False
+    assert "wrong123" in result["message"]
+
+
+# ---------------------------------------------------------------------------
+# Тест E3: не-2xx — возвращает {ok: false} с HTTP-статусом
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_test_endpoint_non_2xx():
+    """При не-2xx ответе — ok=False с кодом статуса в message."""
+    from app.routers.source import _test_webhook
+
+    url = "https://example.com/hook"
+    respx.post(url).mock(return_value=httpx.Response(500, text="Internal Server Error"))
+
+    result = await _test_webhook(url)
+
+    assert result["ok"] is False
+    assert "500" in result["message"]
+
+
+# ---------------------------------------------------------------------------
+# Тест E4: таймаут — возвращает {ok: false, message: "Таймаут 30 с"}
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_test_endpoint_timeout():
+    """При таймауте — ok=False, message содержит 'Таймаут'."""
+    from app.routers.source import _test_webhook
+
+    url = "https://example.com/hook"
+    respx.post(url).mock(side_effect=httpx.TimeoutException("timeout"))
+
+    result = await _test_webhook(url)
+
+    assert result["ok"] is False
+    assert "Таймаут" in result["message"]
+
+
+# ---------------------------------------------------------------------------
+# Тест E5: невалидный URL — возвращает {ok: false} без HTTP-запроса
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_webhook_test_endpoint_invalid_url():
+    """При невалидном URL — ok=False без обращения к сети."""
+    from app.routers.source import _test_webhook
+
+    result = await _test_webhook("ftp://not-http.example.com")
+
+    assert result["ok"] is False
+    assert "http" in result["message"].lower()
