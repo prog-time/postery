@@ -85,6 +85,20 @@
                                     {% endfor %}
                                 </optgroup>
                                 {% endif %}
+
+                                {% if wh_sources %}
+                                <optgroup label="Webhook">
+                                    {% for s in wh_sources %}
+                                    <option value="webhook:{{ s.id }}"
+                                            data-type="webhook"
+                                            data-name="{{ s.name }}"
+                                            data-source-id="{{ s.id }}"
+                                            {% if selected_source == 'webhook:' ~ s.id|string %}selected{% endif %}>
+                                        {{ s.name }}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
                             </select>
                         </div>
 
@@ -140,11 +154,13 @@
         telegram: 'fa-brands fa-telegram',
         vk:       'fa-brands fa-vk',
         max:      'fa-solid fa-message',
+        webhook:  'fa fa-link',
     };
     const COLORS = {
         telegram: '#0088cc',
         vk:       '#4680c2',
         max:      '#5b5ea6',
+        webhook:  '#64748b',
     };
 
     const sel    = document.getElementById('source-select');

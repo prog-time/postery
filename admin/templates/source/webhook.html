@@ -1,0 +1,129 @@
+{% extends "layout.html" %}
+
+{% block header %}
+<div class="d-flex justify-content-between align-items-center">
+    <h1>
+        <i class="fa fa-link me-2 text-primary"></i>
+        {{ "Редактирование" if editing else "Добавление" }} — Webhook
+    </h1>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for(__name__ ~ ':index') }}">Админ</a></li>
+        <li class="breadcrumb-item"><a href="{{ list_url }}">Webhook</a></li>
+        <li class="breadcrumb-item active">{{ "Редактирование" if editing else "Добавление" }}</li>
+    </ol>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-lg-7">
+            <div class="card">
+                {% set form_action = (wizard_url ~ '?pk=' ~ source.id) if editing else wizard_url %}
+                <form action="{{ form_action }}" method="POST">
+                    {% if editing %}
+                    {# ── Вкладки (только редактирование) ── #}
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs px-3" role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link {% if not errors.ai_prompt_title and not errors.ai_prompt_description %}active{% endif %}"
+                                   data-bs-toggle="tab" href="#tab-params" role="tab">
+                                    <i class="fa-solid fa-sliders me-1"></i>Параметры источника
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if errors.ai_prompt_title or errors.ai_prompt_description %}active{% endif %}"
+                                   data-bs-toggle="tab" href="#tab-ai" role="tab">
+                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Настройки AI
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="tab-content">
+                        <div class="tab-pane {% if not errors.ai_prompt_title and not errors.ai_prompt_description %}active{% endif %}"
+                             id="tab-params">
+                            <div class="card-body border-bottom py-3">
+                                {% include "source/_webhook_fields.html" %}
+                            </div>
+                        </div>
+                        <div class="tab-pane {% if errors.ai_prompt_title or errors.ai_prompt_description %}active{% endif %}"
+                             id="tab-ai">
+                            <div class="card-body border-bottom py-3">
+                                {% include "source/_ai_prompts_tab.html" %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    {# ── Без вкладок (создание) ── #}
+                    <div class="card-body border-bottom py-3">
+                        {% include "source/_webhook_fields.html" %}
+                    </div>
+                    {% endif %}
+
+                    <div class="card-footer">
+                        <div class="btn-list ms-auto justify-content-end">
+                            <a href="{{ list_url }}" class="btn btn-danger">Отмена</a>
+                            <button type="button" id="btn-test" class="btn btn-secondary">
+                                <i class="fa-solid fa-plug me-1"></i>Проверить
+                            </button>
+                            <button type="submit" id="btn-save" class="btn btn-success">
+                                Сохранить
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+{{ super() }}
+<script>
+(function () {
+    const btnTest   = document.getElementById('btn-test');
+    const btnSave   = document.getElementById('btn-save');
+    const statusDiv = document.getElementById('wh-test-status');
+    const msgDiv    = document.getElementById('wh-test-msg');
+    const urlInput  = document.querySelector('[name="webhook_url"]');
+
+    function showMsg(ok, text) {
+        statusDiv.style.display = 'block';
+        msgDiv.className = ok ? 'alert alert-success mb-0' : 'alert alert-danger mb-0';
+        msgDiv.innerHTML = `<i class="fa-solid ${ok ? 'fa-check-circle' : 'fa-times-circle'}" style="display:flex;${ok ? 'color:#2ab57d;' : ''}"></i>${text}`;
+    }
+
+    btnTest.addEventListener('click', async () => {
+        const url = urlInput ? urlInput.value.trim() : '';
+
+        if (!url) {
+            showMsg(false, 'Введите Webhook URL');
+            return;
+        }
+
+        btnTest.disabled = true;
+        btnTest.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Проверяем…';
+
+        try {
+            const resp = await fetch('/api/source/webhook/test', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ webhook_url: url }),
+            });
+            const result = await resp.json();
+            if (result.ok) {
+                showMsg(true, result.message || 'Подключение успешно');
+            } else {
+                showMsg(false, result.message || 'Ошибка подключения');
+            }
+        } catch (e) {
+            showMsg(false, 'Ошибка запроса: ' + e.message);
+        } finally {
+            btnTest.disabled = false;
+            btnTest.innerHTML = '<i class="fa-solid fa-plug me-1"></i>Проверить';
+        }
+    });
+})();
+</script>
+{% endblock %}

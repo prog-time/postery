@@ -7,7 +7,7 @@ from starlette_admin.views import CustomView
 
 from app.auth import EditorAccessMixin
 from app.database import SessionLocal
-from app.models import TelegramSource, VKSource, MAXSource
+from app.models import TelegramSource, VKSource, MAXSource, WebhookSource
 from app.models.post import Post, PostChannel, PostStatus, ChannelStatus
 
 _LIST_URL = "/admin/posts"
@@ -34,6 +34,7 @@ class AddChannelView(EditorAccessMixin, CustomView):
             tg_sources = db.query(TelegramSource).filter(TelegramSource.is_active.is_(True)).order_by(TelegramSource.name).all()
             vk_sources = db.query(VKSource).filter(VKSource.is_active.is_(True)).order_by(VKSource.name).all()
             mx_sources = db.query(MAXSource).filter(MAXSource.is_active.is_(True)).order_by(MAXSource.name).all()
+            wh_sources = db.query(WebhookSource).filter(WebhookSource.is_active.is_(True)).order_by(WebhookSource.name).all()
 
         return templates.TemplateResponse(
             request=request,
@@ -43,6 +44,7 @@ class AddChannelView(EditorAccessMixin, CustomView):
                 "tg_sources": tg_sources,
                 "vk_sources": vk_sources,
                 "mx_sources": mx_sources,
+                "wh_sources": wh_sources,
             },
         )
 
@@ -111,6 +113,7 @@ class AddChannelView(EditorAccessMixin, CustomView):
             tg_sources = db.query(TelegramSource).filter(TelegramSource.is_active.is_(True)).order_by(TelegramSource.name).all()
             vk_sources = db.query(VKSource).filter(VKSource.is_active.is_(True)).order_by(VKSource.name).all()
             mx_sources = db.query(MAXSource).filter(MAXSource.is_active.is_(True)).order_by(MAXSource.name).all()
+            wh_sources = db.query(WebhookSource).filter(WebhookSource.is_active.is_(True)).order_by(WebhookSource.name).all()
 
         return templates.TemplateResponse(
             request=request,
@@ -120,6 +123,7 @@ class AddChannelView(EditorAccessMixin, CustomView):
                 "tg_sources": tg_sources,
                 "vk_sources": vk_sources,
                 "mx_sources": mx_sources,
+                "wh_sources": wh_sources,
                 "error":      error,
                 **(form_data or {}),
             },

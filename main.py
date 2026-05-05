@@ -113,6 +113,11 @@ def _migrate() -> None:
         ("max_sources",      "auto_generate",         _bool_default(0)),
         # BASE-PROMPT: global base system prompt per AI provider
         ("ai_providers",     "base_prompt",           "TEXT"),
+        # Issue #4: WebhookSource columns (table created by Base.metadata.create_all)
+        ("webhook_sources",  "secret",                "TEXT"),
+        ("webhook_sources",  "ai_prompt_title",       "TEXT"),
+        ("webhook_sources",  "ai_prompt_description", "TEXT"),
+        ("webhook_sources",  "auto_generate",         _bool_default(0)),
     ]
     inspector = sa_inspect(engine)
     with engine.connect() as conn:

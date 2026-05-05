@@ -13,13 +13,14 @@ A source is a configured publishing destination. Every source must store its cre
 
 ## 2. What Is This Domain?
 
-A **Source** is a configured publishing destination on a specific platform. There are three source types, each with its own ORM model, database table, admin list view, and wizard:
+A **Source** is a configured publishing destination on a specific platform. There are four source types, each with its own ORM model, database table, admin list view, and wizard:
 
 | Source | Model | Table | Wizard View | List Identity |
 |--------|-------|-------|-------------|---------------|
 | Telegram | `TelegramSource` | `telegram_sources` | `TelegramSourceWizardView` | `telegram-source` |
 | VKontakte | `VKSource` | `vk_sources` | `VKSourceWizardView` | `v-k-source` |
 | MAX Messenger | `MAXSource` | `max_sources` | `MAXSourceWizardView` | `m-a-x-source` |
+| Webhook | `WebhookSource` | `webhook_sources` | `WebhookSourceWizardView` | `webhook-source` |
 
 ### Key Concepts
 
@@ -119,13 +120,22 @@ source.bot_token = bot_token
 | Telegram | `POST /api/source/telegram/test` | `bot_token` | `chat_id` |
 | VKontakte | `POST /api/source/vk/test` | `access_token`, `group_id` | — |
 | MAX | `POST /api/source/max/test` | `bot_token` | `chat_id` |
+| Webhook | `POST /api/source/webhook/test` | `webhook_url` | — |
 
 All return:
 ```json
-{"ok": true, "message": "Подключение успешно (@botname)"}
+{"ok": true, "message": "human-readable reason"}
 // or
-{"ok": false, "error": "human-readable reason"}
+{"ok": false, "message": "human-readable reason"}
 ```
+
+**Webhook handshake** is different from other platforms — it uses a VK-style confirmation protocol:
+1. Postery POSTs `{"type":"confirmation"}` to `webhook_url`
+2. The server must respond with plain-text body equal to `confirmation_code(webhook_url)`
+3. `confirmation_code` = `HMAC-SHA1("{webhook_url}:{YYYY-MM-DD}", SECRET_KEY)[:8]`
+4. Code is stateless — recomputed on every check, rotates daily, depends on the URL
+
+See also `BR-012` below.
 
 ---
 
@@ -146,6 +156,21 @@ All return:
 - `chat_id` is the numeric channel/chat ID (stored as string)
 - Auth uses `Authorization: Bearer {bot_token}` header
 - Validated via `GET https://botapi.max.ru/me`
+
+### Webhook
+- `webhook_url` must start with `http://` or `https://`; rejected otherwise
+- Optional `secret` stored via `EncryptedString`; when set, each request carries `X-Postery-Signature: sha256=<hmac-sha256>` over the full envelope body bytes
+- HTTP timeout: 30 seconds (matching Telegram publisher)
+- Success = any HTTP 2xx; anything else is treated as a failure and enters the retry cycle
+- Error storage: `HTTP {status}: {first 500 chars of body}` saved to `PostChannel.error_message`
+- SSRF hardening (blocking private/loopback IPs) is out of scope — tracked as a follow-up
+
+**BR-012** — Webhook confirmation handshake is stateless and rotates daily:
+- Code = `HMAC-SHA1("{webhook_url}:{date.today().isoformat()}", SECRET_KEY)[:8]`
+- Server must respond plain-text with this exact code to `POST {"type":"confirmation"}`
+- Postery `.strip()`s the response body before comparison
+- The UI shows the current code in `_webhook_fields.html` (rendered by `WebhookSourceWizardView`)
+- The test endpoint (`POST /api/source/webhook/test`) performs the handshake and always returns HTTP 200 with `{"ok": bool, "message": str}`
 
 ---
 
