@@ -161,6 +161,7 @@ async def publish(text, source, image_paths):
   - `source_id` is at the top-level envelope, NOT inside `object`
   - `object` contains all per-post fields (no `source_id` there)
   - HMAC signs the full serialised envelope (all bytes), not just `object`
+- **`image_urls` shape:** absolute when `PUBLIC_BASE_URL` is configured (`https://host/data/uploads/...`), relative otherwise (`/data/uploads/...`). For self-host with external webhook receivers — always set `PUBLIC_BASE_URL` in `.env`, otherwise the receiver gets paths it cannot resolve.
 - **Context injection:** Worker sets `source._channel_context = {post_id, title, description, tags}` before calling `publish()`
 - **Log line:** `Webhook publish → url=... type=publish object_keys=[...]`
 - **SSRF hardening:** out of scope — tracked as follow-up
