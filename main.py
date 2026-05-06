@@ -18,6 +18,7 @@ from app.database import engine, Base, SessionLocal
 from app.admin import create_admin
 from app.routers.main import router
 from app.routers.logs import router as logs_router
+from app.routers.health import router as health_router
 from app.models.admin_user import AdminUser, Role
 from app.auth import hash_password
 from app.worker import run_worker
@@ -232,16 +233,36 @@ _backfill_post_images()
 
 
 def init_default_admin() -> None:
+    """Создаёт первого суперадмина при пустой БД.
+
+    Если переменные окружения INITIAL_ADMIN_USERNAME и INITIAL_ADMIN_PASSWORD
+    заданы — использует их. Иначе создаёт admin/admin и выводит предупреждение.
+    """
+    import os
+    _log = logging.getLogger(__name__)
     with SessionLocal() as db:
         if not db.query(AdminUser).first():
+            env_user = os.environ.get("INITIAL_ADMIN_USERNAME", "").strip()
+            env_pass = os.environ.get("INITIAL_ADMIN_PASSWORD", "").strip()
+            if env_user and env_pass:
+                username = env_user
+                password = env_pass
+                _log.info("Creating initial admin from INITIAL_ADMIN_* env vars: %s", username)
+            else:
+                username = "admin"
+                password = "admin"
+                _log.warning(
+                    "INITIAL_ADMIN_USERNAME / INITIAL_ADMIN_PASSWORD not set — "
+                    "creating default admin/admin. Change this password immediately!"
+                )
             db.add(AdminUser(
-                username="admin",
-                password_hash=hash_password("admin"),
+                username=username,
+                password_hash=hash_password(password),
                 role=Role.SUPERADMIN,
                 is_active=True,
             ))
             db.commit()
-            print("Default admin created: admin / admin")
+            print(f"Default admin created: {username}")
 
 
 init_default_admin()
@@ -287,6 +308,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 app.include_router(router)
 app.include_router(logs_router)  # TASK-LOG-005: эндпоинт скачивания логов
+# GET /health — публичный healthcheck для Docker и внешних мониторингов (Issue #6)
+# Регистрируется напрямую на app, а не через app/routers/main.py, т.к. это
+# инфра-эндпоинт (не admin UI API) и нужен без сессионной авторизации.
+app.include_router(health_router)
 
 # Отдаём загруженные изображения постов по пути /data/uploads/...
 _uploads_dir = BASE_DIR / "data" / "uploads"
