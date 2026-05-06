@@ -9,7 +9,7 @@ python-multipart
 itsdangerous
 bcrypt
 httpx
-cryptography
+cryptography<43
 python-dotenv
 slowapi
 mistune>=3.0
