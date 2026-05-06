@@ -3,6 +3,7 @@ uvicorn[standard]
 starlette-admin[full]
 sqlalchemy
 aiosqlite
+psycopg2-binary
 jinja2
 python-multipart
 itsdangerous
