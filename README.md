@@ -89,6 +89,20 @@ docker compose up -d
 > Это небезопасно. Задайте `INITIAL_ADMIN_USERNAME` и `INITIAL_ADMIN_PASSWORD` в `.env`
 > до первого старта, или смените пароль через `python create_superadmin.py` после запуска.
 
+### Выбор базы данных
+
+Образ поддерживает обе БД из коробки — драйверы SQLite и PostgreSQL включены в `requirements.txt`.
+
+```bash
+# SQLite (по умолчанию, файл в ./data/admin.db, ничего настраивать не нужно):
+DATABASE_URL=sqlite:///data/admin.db
+
+# PostgreSQL (внешний сервер):
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+```
+
+Postery не разворачивает Postgres-сервер сам — используйте внешнюю инсталляцию (managed-сервис, отдельный контейнер, on-prem).
+
 Проверить состояние контейнера:
 
 ```bash

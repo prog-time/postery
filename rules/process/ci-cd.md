@@ -35,7 +35,9 @@ docker compose up -d --build
 
 **Rules for Docker deployment:**
 - `./data/` is bind-mounted into the container — all persistent data lives there on the host
-- The worker runs in the same process as FastAPI (via `lifespan asyncio.create_task`) — do not split into a separate `worker` service (SQLite constraint)
+- The worker runs in the same process as FastAPI (via `lifespan asyncio.create_task`) — do not split into a separate `worker` service (SQLite single-writer constraint; on PostgreSQL the constraint relaxes but the deployment shape stays the same)
+- Both SQLite and PostgreSQL drivers (`aiosqlite`, `psycopg2-binary`) ship in the default image; switch via `DATABASE_URL` in `.env`. Postgres server itself is not bundled — point at an external instance.
+- Heroku-style `postgres://` URLs are auto-normalized to `postgresql://` in `app/database.py` (SQLAlchemy 2.x rejects the legacy scheme).
 - `restart: unless-stopped` handles process crashes and server reboots automatically
 - Healthcheck: `curl -fsS http://localhost:8000/health` — container reaches `healthy` status ~30 s after start
 - `SECRET_KEY` must be set before first start; changing it later makes all DB-encrypted tokens unreadable
