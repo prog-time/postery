@@ -16,9 +16,11 @@ from app.models.post import PostChannel, ChannelStatus, PostStatus
 from app.models.sources.telegram import TelegramSource
 from app.models.sources.vk import VKSource
 from app.models.sources.max_messenger import MAXSource
+from app.models.sources.webhook import WebhookSource
 from app.publisher import telegram as tg_publisher
 from app.publisher import vk as vk_publisher
 from app.publisher import max_messenger as max_publisher
+from app.publisher import webhook as webhook_publisher
 
 log = logging.getLogger("worker")
 
@@ -73,6 +75,8 @@ async def _publish_channel(channel_id: int):
             source = db.get(VKSource, channel.source_id)
         elif channel.source_type == "max":
             source = db.get(MAXSource, channel.source_id)
+        elif channel.source_type == "webhook":
+            source = db.get(WebhookSource, channel.source_id)
 
         if not source:
             channel.status = ChannelStatus.FAILED
@@ -97,6 +101,15 @@ async def _publish_channel(channel_id: int):
             success, error = await vk_publisher.publish(text_plain, source, image_paths)
         elif channel.source_type == "max":
             success, error = await max_publisher.publish(text_plain, source, image_paths)
+        elif channel.source_type == "webhook":
+            # Инжектируем контекст поста/канала в source для формирования payload
+            source._channel_context = {
+                "post_id":     post.id,
+                "title":       channel.effective_title,
+                "description": channel.effective_description,
+                "tags":        post.tags,
+            }
+            success, error = await webhook_publisher.publish(text_plain, source, image_paths)
         else:
             success, error = False, f"Unsupported source type: {channel.source_type}"
 

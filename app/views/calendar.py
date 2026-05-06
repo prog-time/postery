@@ -9,18 +9,20 @@ from starlette.templating import Jinja2Templates
 from starlette_admin.views import CustomView
 
 from app.database import SessionLocal
-from app.models import TelegramSource, VKSource, MAXSource
+from app.models import TelegramSource, VKSource, MAXSource, WebhookSource
 from app.models.post import Post, PostChannel
 
 _SOURCE_ICONS = {
     "telegram": "fa-brands fa-telegram",
     "vk":       "fa-brands fa-vk",
     "max":      "fa-solid fa-message",
+    "webhook":  "fa fa-link",
 }
 _SOURCE_COLORS = {
     "telegram": "#0088cc",
     "vk":       "#4680c2",
     "max":      "#5b5ea6",
+    "webhook":  "#64748b",
 }
 _MONTHS_RU = [
     "", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -64,6 +66,7 @@ class CalendarView(CustomView):
             tg  = {s.id: s for s in db.query(TelegramSource).all()}
             vk  = {s.id: s for s in db.query(VKSource).all()}
             mx  = {s.id: s for s in db.query(MAXSource).all()}
+            wh  = {s.id: s for s in db.query(WebhookSource).all()}
 
             # PostChannels с датой в этом месяце
             channels = (
@@ -91,7 +94,7 @@ class CalendarView(CustomView):
                 ds = d.isoformat()
                 day_data[ds]["sources"].add(ch.source_type)
 
-                src_map = {"telegram": tg, "vk": vk, "max": mx}
+                src_map = {"telegram": tg, "vk": vk, "max": mx, "webhook": wh}
                 src_obj = src_map.get(ch.source_type, {}).get(ch.source_id)
 
                 day_data[ds]["hours"][dt.hour].append({

@@ -21,7 +21,7 @@ from app.config import SECRET_KEY, TEMPLATES_DIR, STATICS_DIR
 
 log_audit = logging.getLogger("admin.audit")
 from app.database import engine, SessionLocal
-from app.models import TelegramSource, VKSource, MAXSource, AdminUser, Role
+from app.models import TelegramSource, VKSource, MAXSource, WebhookSource, AdminUser, Role
 from app.models import Post, PostChannel, PostStatus, ChannelStatus
 from app.models.providers import AIProvider, ProviderType
 from app.auth import RoleAuthProvider, SuperadminOnly, EditorAccessMixin
@@ -33,6 +33,7 @@ from app.views.ai_provider import AIProviderWizardView
 from app.views.telegram_source import TelegramSourceWizardView
 from app.views.vk_source import VKSourceWizardView
 from app.views.max_source import MAXSourceWizardView
+from app.views.webhook_source import WebhookSourceWizardView
 from app.views.logs import LogsView
 from app.fields import TokenField, PasswordField, TranslatedEnumField
 from app.auth import hash_password
@@ -263,6 +264,44 @@ class MAXSourceView(EditorAccessMixin, ModelView):
     page_size = 20
 
 
+class WebhookSourceView(EditorAccessMixin, ModelView):
+    icon = "fa fa-link"
+    label = "Webhook"
+    name = "webhook_source"
+    pk_attr = "id"
+
+    def can_view_details(self, request) -> bool:
+        return False
+
+    def can_create(self, request) -> bool:
+        return False
+
+    @link_row_action(
+        name="edit",
+        text="Редактировать",
+        icon_class="fa-solid fa-pen-to-square",
+    )
+    def row_action_2_edit(self, request: Request, pk) -> str:
+        return f"/admin/webhook-source/wizard?pk={pk}"
+
+    fields = [
+        IntegerField("id", label="ID", read_only=True, exclude_from_create=True),
+        StringField("name", label="Название",
+                    help_text="Понятное имя, например: Блог WordPress"),
+        StringField("webhook_url", label="Webhook URL",
+                    help_text="URL для HTTP POST-запросов"),
+        BooleanField("is_active", label="Активен"),
+        DateTimeField("created_at", label="Создан", read_only=True,
+                      exclude_from_create=True, exclude_from_edit=True,
+                      output_format="%d.%m.%Y %H:%M"),
+    ]
+
+    column_list = ["id", "name", "webhook_url", "is_active", "created_at"]
+    sortable_fields = ["id", "name", "is_active", "created_at"]
+    searchable_fields = ["name", "webhook_url"]
+    page_size = 20
+
+
 # ── AI провайдеры ────────────────────────────────────────────────────────────
 
 class AIProviderView(SuperadminOnly, ModelView):
@@ -405,12 +444,14 @@ def create_admin() -> Admin:
                 TelegramSourceView(TelegramSource),
                 VKSourceView(VKSource),
                 MAXSourceView(MAXSource),
+                WebhookSourceView(WebhookSource),
             ],
         )
     )
     admin.add_view(TelegramSourceWizardView(label="Добавить Telegram-источник"))
     admin.add_view(VKSourceWizardView(label="Добавить VK-источник"))
     admin.add_view(MAXSourceWizardView(label="Добавить MAX-источник"))
+    admin.add_view(WebhookSourceWizardView(label="Добавить Webhook-источник"))
 
     # AI провайдеры
     admin.add_view(AIProviderView(AIProvider, icon="fa-solid fa-robot"))

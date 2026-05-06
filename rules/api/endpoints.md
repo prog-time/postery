@@ -213,7 +213,45 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 
 ---
 
-### 2.7 Delete Post Image
+### 2.7 Webhook Source Connection Test (VK-style handshake)
+
+```
+POST /api/source/webhook/test
+```
+
+Router: `app/routers/source.py` (prefix `/api/source`)
+
+**Request body (JSON):**
+```json
+{
+  "webhook_url": "string"   // must start with http:// or https://
+}
+```
+
+**All responses are HTTP 200 with `{"ok": bool, "message": str}`:**
+
+| Outcome | Response |
+|---------|----------|
+| Confirmation matched | `{"ok": true, "message": "Сервер подтвердил адрес"}` |
+| Confirmation mismatched | `{"ok": false, "message": "Сервер вернул '{actual}', ожидалось '{expected}'"}` |
+| Non-2xx response | `{"ok": false, "message": "HTTP {status}: {body[:200]}"}` |
+| Timeout | `{"ok": false, "message": "Таймаут 30 с"}` |
+| Invalid URL | `{"ok": false, "message": "URL должен начинаться с http:// или https://"}` |
+| Network error | `{"ok": false, "message": "Ошибка: {str(exc)[:200]}"}` |
+
+**Timeouts:** 30 s (matching Webhook publisher).
+
+**Side effects:** None — sends confirmation POST to the provided URL, no DB writes.
+
+**Handshake protocol:**
+1. Compute `expected = confirmation_code(webhook_url)` — 8-char hex, HMAC-SHA1 of `"{url}:{today}"` keyed with `SECRET_KEY`, truncated to 8 chars
+2. POST `{"type": "confirmation"}` (JSON) to `webhook_url`
+3. `.strip()` the response body and compare with `expected`
+4. Code rotates daily; the UI shows the current expected code in the edit/create form
+
+---
+
+### 2.8 Delete Post Image
 
 ```
 DELETE /api/posts/image/{image_id}
@@ -285,6 +323,8 @@ Do not add REST logic to admin view `render()` methods. Keep admin views as rend
 | VK wizard | `GET/POST /admin/vk-source/wizard` | CustomView |
 | MAX source list | `GET /admin/m-a-x-source/list` | ModelView |
 | MAX wizard | `GET/POST /admin/max-source/wizard` | CustomView |
+| Webhook source list | `GET /admin/webhook-source/list` | ModelView |
+| Webhook wizard | `GET/POST /admin/webhook-source/wizard` | CustomView |
 | AI provider list | `GET /admin/ai-provider/list` | ModelView |
 | AI provider wizard | `GET/POST /admin/ai-provider/wizard` | CustomView |
 | Admin users | `GET /admin/admin-user/list` | ModelView |

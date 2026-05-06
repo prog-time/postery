@@ -1,8 +1,58 @@
+import re
+
 import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.publisher.webhook import confirmation_code
+
 router = APIRouter(prefix="/api/source", tags=["source"])
+
+_URL_RE = re.compile(r"^https?://", re.IGNORECASE)
+
+
+# ── Webhook ───────────────────────────────────────────────────────────────────
+
+class WebhookTestRequest(BaseModel):
+    webhook_url: str
+
+
+@router.post("/webhook/test")
+async def test_webhook(body: WebhookTestRequest):
+    return await _test_webhook(body.webhook_url)
+
+
+async def _test_webhook(webhook_url: str) -> dict:
+    """VK-style handshake: отправляет {"type":"confirmation"} и сверяет ответ.
+
+    Всегда возвращает HTTP 200 с телом {"ok": bool, "message": str}.
+    """
+    if not _URL_RE.match(webhook_url):
+        return {"ok": False, "message": "URL должен начинаться с http:// или https://"}
+
+    expected = confirmation_code(webhook_url)
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                webhook_url,
+                json={"type": "confirmation"},
+            )
+    except httpx.TimeoutException:
+        return {"ok": False, "message": "Таймаут 30 с"}
+    except Exception as exc:
+        return {"ok": False, "message": f"Ошибка: {str(exc)[:200]}"}
+
+    if not resp.is_success:
+        return {"ok": False, "message": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+
+    actual = resp.text.strip()
+    if actual == expected:
+        return {"ok": True, "message": "Сервер подтвердил адрес"}
+    return {
+        "ok": False,
+        "message": f"Сервер вернул '{actual[:80]}', ожидалось '{expected}'",
+    }
 
 
 # ── VK ────────────────────────────────────────────────────────────────────────

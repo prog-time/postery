@@ -74,6 +74,10 @@
                                 <a href="/admin/max-source/wizard" class="btn btn-primary">
                                     <i class="fa-solid fa-plus me-2"></i>Добавить
                                 </a>
+                            {% elif model.identity == 'webhook-source' %}
+                                <a href="/admin/webhook-source/wizard" class="btn btn-primary">
+                                    <i class="fa-solid fa-plus me-2"></i>Добавить
+                                </a>
                             {% elif model.can_create(request) %}
                                 <a href="{{ model.wizard_create_url if model.wizard_create_url is defined else url_for(__name__ ~ ':create', identity=model.identity) }}"
                                    class="btn btn-primary">
@@ -312,6 +316,7 @@
             'telegram-source': { icon: 'fa-brands fa-telegram',      text: 'Telegram-источников ещё нет',  action: '<a href="/admin/telegram-source/wizard">Добавить первый</a>' },
             'v-k-source':      { icon: 'fa-brands fa-vk',            text: 'ВКонтакте-источников ещё нет', action: '<a href="/admin/vk-source/wizard">Добавить первый</a>' },
             'm-a-x-source':    { icon: 'fa-solid fa-comment-dots',   text: 'MAX-источников ещё нет',       action: '<a href="/admin/max-source/wizard">Добавить первый</a>' },
+            'webhook-source':  { icon: 'fa fa-link',                 text: 'Webhook-источников ещё нет',   action: '<a href="/admin/webhook-source/wizard">Добавить первый</a>' },
             'ai-provider':     { icon: 'fa-solid fa-robot',          text: 'AI-провайдеров ещё нет',       action: '<a href="/admin/ai-provider/wizard?type=openai">Добавить первый</a>' },
             'admin-user':      { icon: 'fa-solid fa-users',          text: 'Пользователей ещё нет',        action: null },
         };
