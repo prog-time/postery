@@ -13,22 +13,45 @@ This file documents the current manual deployment process and the standards that
 
 ---
 
-## 2. Current Deployment Process
+## 2. Deployment Processes
 
-Deployment is manual via `start.sh`:
+### 2.1 Docker (recommended for self-host, production)
+
+Three-command deployment on any machine with Docker and Docker Compose:
 
 ```bash
-# ✅ Current deployment steps
-git pull
-pip install -r requirements.txt
-# restart uvicorn (kill existing process, then:)
-uvicorn main:app --host 0.0.0.0 --port 8000
+git clone https://github.com/prog-time/postery.git
+cp .env.example .env
+# Set SECRET_KEY and optionally INITIAL_ADMIN_* in .env
+docker compose up -d
 ```
 
-The `start.sh` file at the project root wraps the uvicorn start command.
+Update to a new version:
 
-**Rules for manual deployment:**
-- Always run `pip install -r requirements.txt` after pulling, in case new dependencies were added
+```bash
+git pull
+docker compose up -d --build
+```
+
+**Rules for Docker deployment:**
+- `./data/` is bind-mounted into the container — all persistent data lives there on the host
+- The worker runs in the same process as FastAPI (via `lifespan asyncio.create_task`) — do not split into a separate `worker` service (SQLite constraint)
+- `restart: unless-stopped` handles process crashes and server reboots automatically
+- Healthcheck: `curl -fsS http://localhost:8000/health` — container reaches `healthy` status ~30 s after start
+- `SECRET_KEY` must be set before first start; changing it later makes all DB-encrypted tokens unreadable
+- `INITIAL_ADMIN_USERNAME` / `INITIAL_ADMIN_PASSWORD` set the first admin's credentials on first start with empty DB; if unset, `admin/admin` is created (change immediately via `/admin` or `python create_superadmin.py`)
+
+### 2.2 Local development (start.sh)
+
+`start.sh` is for local development only and is not included in the Docker image (excluded via `.dockerignore`).
+
+```bash
+pip install -r requirements.txt
+./start.sh
+```
+
+**Rules for local deployment:**
+- Always run `pip install -r requirements.txt` after pulling new changes
 - Never restart the app without verifying the new code starts without import errors
 - The background worker starts automatically via the `lifespan` context in `main.py` — no separate process needed
 
@@ -38,7 +61,15 @@ The `start.sh` file at the project root wraps the uvicorn start command.
 
 Before deploying to any non-development environment, verify:
 
-- [ ] `SECRET_KEY` in `app/config.py` is changed from the default `"change-me-in-production"` to a strong random value
+**Docker:**
+- [ ] `SECRET_KEY` in `.env` is set to a strong random value (never the default placeholder)
+- [ ] `INITIAL_ADMIN_USERNAME` and `INITIAL_ADMIN_PASSWORD` are set, or admin password changed after first start
+- [ ] `./data/` volume is bind-mounted correctly in `docker-compose.yml`
+- [ ] Healthcheck passes (`docker compose ps` shows `healthy` status)
+- [ ] `docker compose logs` shows no startup errors
+
+**Local (start.sh):**
+- [ ] `SECRET_KEY` in `.env` is changed from the default
 - [ ] Default `admin` / `admin` credentials have been changed via `create_superadmin.py`
 - [ ] `data/` directory exists and is writable (for `admin.db` and uploaded images)
 - [ ] `requirements.txt` is up to date with all new dependencies
