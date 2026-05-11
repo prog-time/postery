@@ -69,7 +69,59 @@ python create_superadmin.py
 
 ---
 
-## Запуск
+## Быстрый старт (Docker)
+
+Самый простой способ развернуть Postery на сервере — три команды:
+
+```bash
+git clone https://github.com/prog-time/postery.git
+cp .env.example .env
+# Откройте .env и задайте SECRET_KEY (обязательно) и INITIAL_ADMIN_* (рекомендуется)
+docker compose up -d
+```
+
+После запуска:
+- Приложение доступно на `http://localhost:8000`
+- Админка — на `http://localhost:8000/admin`
+- Данные (БД, фото, логи) хранятся в `./data/` на хосте и переживают пересборку образа
+
+> **Безопасность:** по умолчанию создаётся пользователь `admin` с паролем `admin`.
+> Это небезопасно. Задайте `INITIAL_ADMIN_USERNAME` и `INITIAL_ADMIN_PASSWORD` в `.env`
+> до первого старта, или смените пароль через `python create_superadmin.py` после запуска.
+
+### Выбор базы данных
+
+Образ поддерживает обе БД из коробки — драйверы SQLite и PostgreSQL включены в `requirements.txt`.
+
+```bash
+# SQLite (по умолчанию, файл в ./data/admin.db, ничего настраивать не нужно):
+DATABASE_URL=sqlite:///data/admin.db
+
+# PostgreSQL (внешний сервер):
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+```
+
+Postery не разворачивает Postgres-сервер сам — используйте внешнюю инсталляцию (managed-сервис, отдельный контейнер, on-prem).
+
+Проверить состояние контейнера:
+
+```bash
+docker compose ps        # статус должен быть healthy через ~30 с
+docker compose logs -f   # потоковый вывод логов
+```
+
+Обновить до новой версии:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+---
+
+## Запуск (локальная разработка)
+
+> `start.sh` предназначен для локальной разработки и в Docker-образ не включён.
 
 ### 1. Создайте `.env`
 

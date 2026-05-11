@@ -366,6 +366,63 @@ async def test_webhook_payload_structure():
     assert "source_id" not in obj
 
 
+# ---------------------------------------------------------------------------
+# Тест W7: image_urls остаются относительными без PUBLIC_BASE_URL
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_image_urls_relative_without_base_url(monkeypatch):
+    """Без PUBLIC_BASE_URL image_urls = ['/data/uploads/...'] (обратная совместимость)."""
+    import json as _json
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+    source = make_webhook_source()
+
+    captured = {}
+
+    def capture(request, *args, **kwargs):
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(200)
+
+    respx.post("https://example.com/hook").mock(side_effect=capture)
+
+    await webhook_publisher.publish(
+        "text", source, image_paths=["/abs/data/uploads/42/photo.jpg"],
+    )
+
+    assert captured["body"]["object"]["image_urls"] == ["/data/uploads/42/photo.jpg"]
+
+
+# ---------------------------------------------------------------------------
+# Тест W8: image_urls абсолютные с PUBLIC_BASE_URL
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_webhook_image_urls_absolute_with_base_url(monkeypatch):
+    """С PUBLIC_BASE_URL image_urls = ['https://host/data/uploads/...']."""
+    import json as _json
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://postery.example.com/")  # с trailing slash
+    source = make_webhook_source()
+
+    captured = {}
+
+    def capture(request, *args, **kwargs):
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(200)
+
+    respx.post("https://example.com/hook").mock(side_effect=capture)
+
+    await webhook_publisher.publish(
+        "text", source, image_paths=["/abs/data/uploads/42/photo.jpg"],
+    )
+
+    # Trailing slash должен быть нормализован, без двойного //
+    assert captured["body"]["object"]["image_urls"] == [
+        "https://postery.example.com/data/uploads/42/photo.jpg",
+    ]
+
+
 # ===========================================================================
 # WEBHOOK CONFIRMATION CODE TESTS
 # ===========================================================================

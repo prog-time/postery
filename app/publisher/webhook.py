@@ -50,7 +50,10 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
 
     # Строим публичные URL изображений из относительных путей вида
     # "data/uploads/<post_id>/<filename>".  Файловый путь абсолютный —
-    # отрезаем всё до "data/uploads".
+    # отрезаем всё до "data/uploads".  Если задан PUBLIC_BASE_URL —
+    # отдаём абсолютные URL (нужно получателям, не знающим хост Postery),
+    # иначе — относительные (обратная совместимость со старыми получателями).
+    public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
     image_urls: list[str] = []
     for abs_path in image_paths:
         normalized = abs_path.replace("\\", "/")
@@ -58,7 +61,7 @@ async def publish(text: str, source, image_paths: list[str]) -> tuple[bool, str 
         idx = normalized.find(marker)
         if idx != -1:
             rel = normalized[idx:]  # data/uploads/...
-            image_urls.append(f"/{rel}")
+            image_urls.append(f"{public_base}/{rel}" if public_base else f"/{rel}")
         else:
             image_urls.append(abs_path)
 
@@ -116,7 +119,10 @@ def _build_object(source, image_urls: list[str]) -> dict:
       description    — str | null, текст поста (effective_description)
       tags           — list[str], теги (разбитые по запятой, без #)
       published_at   — str (ISO 8601 UTC), время публикации
-      image_urls     — list[str], публичные URL /data/uploads/...
+      image_urls     — list[str], публичные URL изображений.
+                       Если в окружении задан PUBLIC_BASE_URL — абсолютные
+                       (https://host/data/uploads/...), иначе относительные
+                       (/data/uploads/...) для обратной совместимости.
 
     source_id вынесен на уровень envelope, здесь не дублируется.
     """

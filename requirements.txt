@@ -3,12 +3,13 @@ uvicorn[standard]
 starlette-admin[full]
 sqlalchemy
 aiosqlite
+psycopg2-binary
 jinja2
 python-multipart
 itsdangerous
 bcrypt
 httpx
-cryptography
+cryptography<43
 python-dotenv
 slowapi
 mistune>=3.0

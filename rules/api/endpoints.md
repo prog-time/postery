@@ -13,22 +13,48 @@ The REST API under `/api/` serves the admin UI exclusively. All endpoints are in
 
 ## 2. Endpoint Inventory
 
-### 2.1 Health Check
+### 2.1 Root
 
 ```
 GET /
 ```
 
-Response:
+Response: HTML — admin home page redirect.
+
+Purpose: Entry point for the admin UI. Returns HTML, not JSON.
+
+---
+
+### 2.2 Health Check (Infrastructure)
+
+```
+GET /health
+```
+
+Router: `app/routers/health.py` (registered directly on `app` in `main.py`, not via `app/routers/main.py`)
+
+**No authentication required.**
+
+**Response when DB is available (HTTP 200):**
 ```json
 {"status": "ok"}
 ```
 
-Purpose: Minimal liveness check. No auth required. No DB access.
+**Response when DB is unavailable (HTTP 503):**
+```json
+{"status": "error", "detail": "db_unavailable"}
+```
+
+Purpose: Docker healthcheck and external monitoring probe. Verifies the application is running and the database is reachable via `SELECT 1`.
+
+**Routing exception:** This endpoint is registered directly on the FastAPI `app` instance (not aggregated through `app/routers/main.py`) because:
+1. It is a public infrastructure endpoint, not an admin UI API.
+2. It must be reachable without session middleware interference.
+3. Its router carries no URL prefix — adding it through `app/routers/main.py` (which is an admin-UI router) would be semantically incorrect.
 
 ---
 
-### 2.2 AI Text Generation
+### 2.3 AI Text Generation
 
 ```
 POST /api/ai/generate
@@ -67,7 +93,7 @@ Router: `app/routers/ai_generate.py` (prefix `/api/ai`)
 
 ---
 
-### 2.3 AI Provider Connection Test
+### 2.4 AI Provider Connection Test
 
 ```
 POST /api/ai-provider/test
@@ -105,7 +131,7 @@ Router: `app/routers/ai_provider.py` (prefix `/api/ai-provider`)
 
 ---
 
-### 2.4 Telegram Source Connection Test
+### 2.5 Telegram Source Connection Test
 
 ```
 POST /api/source/telegram/test
@@ -141,7 +167,7 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 
 ---
 
-### 2.5 VKontakte Source Connection Test
+### 2.6 VKontakte Source Connection Test
 
 ```
 POST /api/source/vk/test
@@ -177,7 +203,7 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 
 ---
 
-### 2.6 MAX Source Connection Test
+### 2.7 MAX Source Connection Test
 
 ```
 POST /api/source/max/test
@@ -213,7 +239,7 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 
 ---
 
-### 2.7 Webhook Source Connection Test (VK-style handshake)
+### 2.8 Webhook Source Connection Test (VK-style handshake)
 
 ```
 POST /api/source/webhook/test
@@ -251,7 +277,7 @@ Router: `app/routers/source.py` (prefix `/api/source`)
 
 ---
 
-### 2.8 Delete Post Image
+### 2.9 Delete Post Image
 
 ```
 DELETE /api/posts/image/{image_id}
