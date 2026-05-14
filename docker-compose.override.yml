@@ -1,0 +1,26 @@
+# docker-compose.override.yml — настройки для локальной разработки.
+# Docker Compose автоматически мёрджит этот файл поверх docker-compose.yml при любом
+# вызове без явного -f. В продакшне исключайте его командой:
+#   docker compose -f docker-compose.yml up -d
+#
+# Что добавляет этот файл:
+#   1. bind-mount исходников (.:/app) — изменения кода немедленно видны в контейнере
+#   2. --reload — uvicorn перезапускает приложение при изменении .py-файлов
+#   3. PYTHONDONTWRITEBYTECODE=1 — не создаёт .pyc на хостовой файловой системе
+
+services:
+  app:
+    volumes:
+      # bind-mount всего проекта; идёт ПЕРЕД ./data:/app/data,
+      # чтобы следующий том мог переопределить /app/data поверх него.
+      - .:/app
+      # Сохраняем хостовый ./data/: БД, загрузки, логи не перетираются.
+      - ./data:/app/data
+    command: >
+      uvicorn main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --workers 1
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
