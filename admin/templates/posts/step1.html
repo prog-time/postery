@@ -72,7 +72,9 @@
     background: transparent;
     padding: .1rem .2rem;
 }
+
 </style>
+<link rel="stylesheet" href="/admin/statics/css/editor-tabs.css">
 {% endblock %}
 
 {% block content %}
@@ -97,7 +99,9 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label required">Заголовок</label>
+                    <label class="form-label">
+                        <span class="required">Заголовок</span>
+                    </label>
                     <input type="text" name="title" class="form-control"
                            placeholder="Введите заголовок поста"
                            value="{{ post.title if post else (form.title if form else '') }}"
@@ -106,6 +110,17 @@
 
                 <div class="mb-3">
                     <label class="form-label">Текст</label>
+
+                    {# ── Вкладки редактора ──────────────────────────────── #}
+                    <div class="editor-mode-tabs" id="editor-tabs">
+                        <button type="button" class="tab-btn active" data-mode="markdown" id="tab-markdown">
+                            <i class="fa fa-code me-1"></i>Markdown
+                        </button>
+                        <button type="button" class="tab-btn" data-mode="visual" id="tab-visual">
+                            <i class="fa fa-eye me-1"></i>Визуальный
+                        </button>
+                    </div>
+
                     <textarea name="description" class="form-control" rows="15"
                               placeholder="Текст поста...">{{ post.description if post else (form.description if form else '') }}</textarea>
                 </div>
@@ -189,6 +204,7 @@
 {% block script %}
 <script src="/admin/statics/js/easymde.min.js"></script>
 <script>
+/* ── EasyMDE ─────────────────────────────────────────────────── */
 window.postDescriptionEditor = new EasyMDE({
     element: document.querySelector('textarea[name="description"]'),
     spellChecker: false,
@@ -201,6 +217,48 @@ window.postDescriptionEditor = new EasyMDE({
     status: false,
     minHeight: "200px",
 });
+
+/* ── Editor mode tabs (Markdown / Визуальный) ────────────────── */
+(function () {
+    const editor   = window.postDescriptionEditor;
+    const tabMd    = document.getElementById('tab-markdown');
+    const tabVis   = document.getElementById('tab-visual');
+    const edWrap   = editor.element.closest('.EasyMDEContainer') || editor.codemirror.getWrapperElement().parentElement;
+
+    // Изначально — режим Markdown (редактор виден, превью скрыто)
+    let isVisual = false;
+
+    function switchToMarkdown() {
+        isVisual = false;
+        tabMd.classList.add('active');
+        tabVis.classList.remove('active');
+        // Выключить preview если активен
+        if (editor.isPreviewActive()) editor.togglePreview();
+        edWrap.classList.remove('visual-mode');
+    }
+
+    function switchToVisual() {
+        isVisual = true;
+        tabVis.classList.add('active');
+        tabMd.classList.remove('active');
+        // Включить preview
+        if (!editor.isPreviewActive()) editor.togglePreview();
+        edWrap.classList.add('visual-mode');
+    }
+
+    tabMd.addEventListener('click',  switchToMarkdown);
+    tabVis.addEventListener('click', switchToVisual);
+
+    // Синхронизировать при ручном переключении через тулбар EasyMDE
+    editor.codemirror.on('change', function () {
+        if (isVisual && !editor.isPreviewActive()) {
+            tabMd.classList.add('active');
+            tabVis.classList.remove('active');
+            isVisual = false;
+            edWrap.classList.remove('visual-mode');
+        }
+    });
+})();
 </script>
 <script>
 /* ── Tag input ─────────────────────────────────────────────── */
@@ -348,4 +406,5 @@ async function deleteImage(imageId, btn) {
     }
 }
 </script>
+{{ super() }}
 {% endblock %}
