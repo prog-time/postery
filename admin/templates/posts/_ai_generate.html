@@ -1,0 +1,232 @@
+{#
+  ai_btn(field)    — кнопка «AI» рядом с лейблом поля.
+  ai_modals()      — HTML модалки и оверлея (без скрипта); вставлять в конце block content.
+  ai_script(ctx_id) — JS; вставлять в block script после {{ super() }}.
+#}
+
+{% macro ai_btn(field) %}
+<button type="button"
+        class="btn btn-sm btn-outline-secondary ms-2 ai-gen-btn"
+        data-field="{{ field }}"
+        title="Сгенерировать с помощью AI">
+    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI
+</button>
+{% endmacro %}
+
+
+{% macro ai_modals() %}
+{# ── Модальное окно промпта ─────────────────────────────────────────────── #}
+<div class="modal modal-blur fade" id="aiPromptModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:520px;" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-wand-magic-sparkles me-2 text-primary"></i>Генерация с AI
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-semibold">Промпт для генерации</label>
+                <textarea id="ai-custom-prompt" class="form-control" rows="4"
+                          placeholder="Оставьте поле пустым, если хотите использовать промпт из настроек источника"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" id="ai-prompt-submit" class="btn btn-primary">
+                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Сгенерировать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Оверлей прогресса ──────────────────────────────────────────────────── #}
+<div id="ai-gen-overlay" style="
+    display:none;
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(15,23,42,.55);
+    backdrop-filter:blur(3px);
+    align-items:center;justify-content:center;">
+    <div style="
+        background:#fff;border-radius:12px;
+        padding:2rem 2.5rem;width:340px;
+        box-shadow:0 20px 60px rgba(0,0,0,.3);">
+        <div class="text-center mb-3">
+            <i class="fa-solid fa-wand-magic-sparkles fa-lg text-primary mb-2"></i>
+            <div class="fw-semibold" id="ai-gen-label">Генерация текста…</div>
+        </div>
+        <div class="progress mb-2" style="height:8px;border-radius:4px;">
+            <div id="ai-gen-bar"
+                 class="progress-bar bg-primary progress-bar-animated progress-bar-striped"
+                 style="width:0%;transition:width .3s ease;border-radius:4px;"></div>
+        </div>
+        <div class="text-center text-muted small" id="ai-gen-pct">0%</div>
+        <div id="ai-gen-error" class="alert alert-danger mt-3 mb-0 py-2 small" style="display:none;"></div>
+    </div>
+</div>
+{% endmacro %}
+
+
+{% macro ai_script(auto_generate=false) %}
+<script>
+(function () {
+    const ctx       = document.getElementById('ai-generate-ctx');
+    const overlay   = document.getElementById('ai-gen-overlay');
+    const bar       = document.getElementById('ai-gen-bar');
+    const pctEl     = document.getElementById('ai-gen-pct');
+    const labelEl   = document.getElementById('ai-gen-label');
+    const errorEl   = document.getElementById('ai-gen-error');
+    const promptTA  = document.getElementById('ai-custom-prompt');
+    const submitBtn = document.getElementById('ai-prompt-submit');
+
+    if (!ctx || !overlay || !promptTA || !submitBtn) return;
+
+    let activeField = null;
+    let animTimer   = null;
+    let currentPct  = 0;
+
+    function getModal() {
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('aiPromptModal'));
+    }
+
+    function setProgress(pct) {
+        currentPct = pct;
+        bar.style.width = pct + '%';
+        pctEl.textContent = Math.round(pct) + '%';
+    }
+
+    function startProgress() {
+        setProgress(0);
+        errorEl.style.display = 'none';
+        labelEl.textContent = 'Генерация текста…';
+        overlay.style.display = 'flex';
+        const target = 88, duration = 12000, interval = 100;
+        const increment = target / (duration / interval);
+        animTimer = setInterval(() => {
+            if (currentPct < target) setProgress(Math.min(currentPct + increment, target));
+        }, interval);
+    }
+
+    function finishProgress(ok, errorMsg) {
+        clearInterval(animTimer);
+        if (ok) {
+            setProgress(100);
+            bar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+            bar.classList.add('bg-success');
+            labelEl.textContent = 'Готово!';
+            setTimeout(() => closeOverlay(), 500);
+        } else {
+            setProgress(currentPct);
+            bar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+            bar.classList.add('bg-danger');
+            labelEl.textContent = 'Ошибка';
+            errorEl.textContent = errorMsg || 'Неизвестная ошибка';
+            errorEl.style.display = 'block';
+        }
+    }
+
+    function closeOverlay() {
+        overlay.style.display = 'none';
+        bar.style.width = '0%';
+        bar.className = 'progress-bar bg-primary progress-bar-animated progress-bar-striped';
+        errorEl.style.display = 'none';
+        currentPct = 0;
+    }
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay && errorEl.style.display !== 'none') closeOverlay();
+    });
+
+    // Returns a Promise that resolves when generation completes (success or error).
+    // On error the overlay stays open showing the error — the user can dismiss it.
+    function runGenerate(field, customPrompt) {
+        return new Promise((resolve) => {
+            const sourceType = ctx.dataset.sourceType;
+            const sourceId   = parseInt(ctx.dataset.sourceId, 10);
+
+            if (!sourceType || !sourceId) {
+                alert('Выберите источник публикации перед генерацией');
+                resolve(false);
+                return;
+            }
+
+            const input = document.querySelector(`[name="${field}"]`);
+            if (!input) { resolve(false); return; }
+
+            const text = (field === 'description' && window.postDescriptionEditor)
+                ? window.postDescriptionEditor.value().trim()
+                : input.value.trim();
+            if (!text) {
+                alert('Поле пустое — заполните текст перед генерацией');
+                resolve(false);
+                return;
+            }
+
+            startProgress();
+
+            const payload = {
+                text,
+                source_type: sourceType,
+                source_id:   sourceId,
+                field,
+            };
+            // Сценарий 2: кастомный промпт передан — игнорирует промпт источника
+            // Сценарий 1: customPrompt === null — бэкенд берёт промпт из источника
+            if (customPrompt) payload.prompt = customPrompt;
+
+            fetch('/api/ai/generate', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(payload),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    if (field === 'description' && window.postDescriptionEditor) {
+                        window.postDescriptionEditor.value(data.result);
+                    } else {
+                        input.value = data.result;
+                    }
+                    finishProgress(true);
+                    // Дождаться закрытия оверлея (500 мс анимация) перед resolve
+                    setTimeout(() => resolve(true), 600);
+                } else {
+                    finishProgress(false, data.error);
+                    resolve(false);
+                }
+            })
+            .catch(e => {
+                finishProgress(false, 'Ошибка запроса: ' + e.message);
+                resolve(false);
+            });
+        });
+    }
+
+    // Открыть модалку при клике на AI-кнопку
+    document.querySelectorAll('.ai-gen-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            activeField = btn.dataset.field;
+            promptTA.value = '';
+            getModal().show();
+        });
+    });
+
+    // Кнопка «Сгенерировать» в модалке
+    submitBtn.addEventListener('click', () => {
+        const customPrompt = promptTA.value.trim();
+        getModal().hide();
+        runGenerate(activeField, customPrompt || null);
+    });
+
+    // Автозапуск — если источник настроен на auto_generate (TASK-008)
+    // block script выполняется после DOMContentLoaded, поэтому используем setTimeout
+    {% if auto_generate %}
+    setTimeout(function () {
+        runGenerate('title', null).then(function () {
+            runGenerate('description', null);
+        });
+    }, 0);
+    {% endif %}
+})();
+</script>
+{% endmacro %}
