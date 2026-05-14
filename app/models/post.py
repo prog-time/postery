@@ -37,6 +37,7 @@ class Post(Base):
     channels: Mapped[list["PostChannel"]] = relationship(
         back_populates="post",
         cascade="all, delete-orphan",
+        order_by="PostChannel.id",
     )
 
     def __str__(self) -> str:
