@@ -1,0 +1,62 @@
+/* ── Editor mode tabs (Markdown / Визуальный) ───────────────────────────── */
+.editor-mode-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--tblr-border-color, #d0d7de);
+    margin-bottom: .75rem;
+}
+.editor-mode-tabs .tab-btn {
+    padding: .35rem .9rem;
+    font-size: .8rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: .375rem .375rem 0 0;
+    background: none;
+    cursor: pointer;
+    color: #6c757d;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s, background .15s;
+}
+.editor-mode-tabs .tab-btn:hover {
+    color: #6366f1;
+    background: rgba(99,102,241,.06);
+}
+.editor-mode-tabs .tab-btn.active {
+    color: #6366f1;
+    background: #fff;
+    border-color: var(--tblr-border-color, #d0d7de) var(--tblr-border-color, #d0d7de) #fff;
+}
+
+/* Скрыть панель инструментов EasyMDE в режиме «Визуальный» */
+.visual-mode .editor-toolbar {
+    display: none !important;
+}
+.visual-mode .CodeMirror-scroll {
+    display: none !important;
+}
+
+/* EasyMDE preview: отключаем абсолютное позиционирование, чтобы превью
+   занимало место в потоке документа и подстраивалось под содержимое. */
+.editor-preview {
+    padding: 10px;
+    background: transparent;
+}
+.editor-preview-full {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    box-sizing: border-box;
+    min-height: 270px;
+    position: relative;
+}
+
+.EasyMDEContainer .CodeMirror {
+    background: #fafafa;
+}
+
+.editor-preview pre {
+    background: #eee;
+    margin-bottom: 10px;
+    color: #000;
+}
