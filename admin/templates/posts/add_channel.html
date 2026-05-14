@@ -1,4 +1,20 @@
 {% extends "layout.html" %}
+{% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
+
+{% block head_css %}
+<link rel="stylesheet" href="/admin/statics/css/easymde.min.css">
+<style>
+/* ── Restore Font Awesome 6 overridden by EasyMDE (FA4) ────────────────── */
+:not(.editor-toolbar) .fa,
+:not(.editor-toolbar) .fas,
+:not(.editor-toolbar) .far,
+:not(.editor-toolbar) .fab {
+    font-family: var(--fa-style-family, "Font Awesome 6 Free") !important;
+    font-weight: var(--fa-style, 900) !important;
+}
+</style>
+<link rel="stylesheet" href="/admin/statics/css/editor-tabs.css">
+{% endblock %}
 
 {% block header %}
 <div class="d-flex justify-content-between align-items-center">
@@ -15,6 +31,12 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12 col-lg-7">
+
+            {# Контекст для AI-генерации; source-тип и source-id заполняются JS при выборе источника #}
+            <div id="ai-generate-ctx" hidden
+                 data-source-type=""
+                 data-source-id=""
+                 data-post-id="{{ post.id }}"></div>
 
             {% if error %}
             <div class="alert alert-danger mb-3">{{ error }}</div>
@@ -97,13 +119,30 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Заголовок</label>
+                            <label class="form-label d-flex align-items-center">
+                                Заголовок
+                                {{ ai_btn("title") }}
+                            </label>
                             <input type="text" name="title" class="form-control"
                                    value="{{ form_title if form_title is defined else post.title }}">
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Текст</label>
+                            <label class="form-label d-flex align-items-center">
+                                Текст
+                                {{ ai_btn("description") }}
+                            </label>
+
+                            {# ── Вкладки редактора ──────────────────────────────── #}
+                            <div class="editor-mode-tabs" id="editor-tabs">
+                                <button type="button" class="tab-btn active" data-mode="markdown" id="tab-markdown">
+                                    <i class="fa fa-code me-1"></i>Markdown
+                                </button>
+                                <button type="button" class="tab-btn" data-mode="visual" id="tab-visual">
+                                    <i class="fa fa-eye me-1"></i>Визуальный
+                                </button>
+                            </div>
+
                             <textarea name="description" class="form-control" rows="6"
                                       >{{ form_description if form_description is defined else (post.description or '') }}</textarea>
                         </div>
@@ -130,11 +169,67 @@
     </div>
 </div>
 
+{{ ai_modals() }}
+
 {% endblock %}
 
 {% block script %}
 {{ super() }}
+<script src="/admin/statics/js/easymde.min.js"></script>
 <script>
+/* ── EasyMDE ─────────────────────────────────────────────────── */
+window.postDescriptionEditor = new EasyMDE({
+    element: document.querySelector('textarea[name="description"]'),
+    spellChecker: false,
+    autosave: { enabled: false },
+    toolbar: ["bold", "italic", "strikethrough", "|",
+              "unordered-list", "ordered-list", "|",
+              "link", "code", "|",
+              "preview", "side-by-side", "fullscreen", "|",
+              "guide"],
+    status: false,
+    minHeight: "200px",
+});
+
+/* ── Editor mode tabs (Markdown / Визуальный) ────────────────── */
+(function () {
+    const editor   = window.postDescriptionEditor;
+    const tabMd    = document.getElementById('tab-markdown');
+    const tabVis   = document.getElementById('tab-visual');
+    const edWrap   = editor.element.closest('.EasyMDEContainer') || editor.codemirror.getWrapperElement().parentElement;
+
+    let isVisual = false;
+
+    function switchToMarkdown() {
+        isVisual = false;
+        tabMd.classList.add('active');
+        tabVis.classList.remove('active');
+        if (editor.isPreviewActive()) editor.togglePreview();
+        edWrap.classList.remove('visual-mode');
+    }
+
+    function switchToVisual() {
+        isVisual = true;
+        tabVis.classList.add('active');
+        tabMd.classList.remove('active');
+        if (!editor.isPreviewActive()) editor.togglePreview();
+        edWrap.classList.add('visual-mode');
+    }
+
+    tabMd.addEventListener('click',  switchToMarkdown);
+    tabVis.addEventListener('click', switchToVisual);
+
+    editor.codemirror.on('change', function () {
+        if (isVisual && !editor.isPreviewActive()) {
+            tabMd.classList.add('active');
+            tabVis.classList.remove('active');
+            isVisual = false;
+            edWrap.classList.remove('visual-mode');
+        }
+    });
+})();
+
+/* ── Source select → обновление AI-контекста ─────────────────── */
 (function () {
     const ICONS = {
         telegram: 'fa-brands fa-telegram',
@@ -152,6 +247,7 @@
     const sel    = document.getElementById('source-select');
     const icon   = document.getElementById('source-icon');
     const title  = document.getElementById('source-title');
+    const aiCtx  = document.getElementById('ai-generate-ctx');
 
     function updateHeader() {
         const opt = sel.options[sel.selectedIndex];
@@ -162,12 +258,22 @@
             title.textContent    = opt.dataset.name || opt.text;
             title.style.color    = '#1e293b';
             title.style.fontStyle = 'normal';
+            // Синхронизировать AI-контекст с выбранным источником
+            if (aiCtx) {
+                aiCtx.dataset.sourceType = t;
+                aiCtx.dataset.sourceId   = opt.dataset.sourceId || '';
+            }
         } else {
             icon.className       = 'fa-solid fa-satellite-dish';
             icon.style.color     = '#94a3b8';
             title.textContent    = 'Выберите источник';
             title.style.color    = '#94a3b8';
             title.style.fontStyle = 'italic';
+            // Сбросить AI-контекст
+            if (aiCtx) {
+                aiCtx.dataset.sourceType = '';
+                aiCtx.dataset.sourceId   = '';
+            }
         }
     }
 
@@ -175,4 +281,5 @@
     updateHeader();
 })();
 </script>
+{{ ai_script() }}
 {% endblock %}
