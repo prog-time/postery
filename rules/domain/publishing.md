@@ -65,8 +65,11 @@ _Enforced in:_ `app/publisher/telegram.py`, `app/publisher/vk.py`, `app/publishe
 **BR-012** — Telegram uses `parse_mode=HTML`. Use `<b>title</b>` for bold. VK and MAX use plain text (no HTML tags).
 _Enforced in:_ `app/publisher/utils.py @ build_text()` (`bold_title` parameter)
 
-**BR-013** — `build_text()` converts `description` from raw markdown before appending it to the result. `bold_title=True` (Telegram) → markdown→HTML via `mistune`; `bold_title=False` (VK/MAX) → markdown→plain text (all HTML tags stripped). The title is never markdown-converted.
-_Enforced in:_ `app/publisher/utils.py @ build_text()` / `_md_to_html()` / `_md_to_plain()`
+**BR-013** — `build_text()` converts `description` from raw markdown before appending it to the result. `bold_title=True` (Telegram) → markdown→Telegram-compatible HTML via `mistune`; `bold_title=False` (VK/MAX) → markdown→VK-readable plain text via `_md_to_vk_text()`: links are expanded as `text — URL` (if text == URL, only the URL is emitted; no duplication), list items are rendered with `•`, headings are separated by blank lines, emphasis markers (`**`, `_`, `##`) are stripped. HTML tags are never present in the output. The title is never markdown-converted.
+_Enforced in:_ `app/publisher/utils.py @ build_text()` / `_md_to_html()` / `_md_to_vk_text()`
+
+**BR-014 (VK/MAX links)** — When `_md_to_vk_text()` expands a markdown link `[text](url)`, the format is `text — url` (em-dash with spaces). If `text == url` (bare URL wrapped in markdown), only `url` is emitted to avoid duplication.
+_Enforced in:_ `app/publisher/utils.py @ _md_to_vk_text()`
 
 ---
 
@@ -180,7 +183,9 @@ text_plain = build_text(channel, post, bold_title=False)
 
 `build_text()` output:
 1. `<b>effective_title</b>` or `effective_title` (plain) — title is never markdown-converted
-2. `effective_description` converted from raw markdown: HTML for Telegram, plain text for VK/MAX (if present)
+2. `effective_description` converted from raw markdown:
+   - Telegram: Telegram-compatible HTML (bold, italic, links as `<a href>`, headings as `<b>`)
+   - VK / MAX: readable plain text via `_md_to_vk_text()` — links expanded as `text — URL`, lists with `•`, headings separated by blank lines, no HTML tags
 3. `#hashtag_one #hashtag_two` (if `post.tags` present)
 
 Parts joined with `\n\n`.
