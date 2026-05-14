@@ -1,5 +1,4 @@
 {% extends "layout.html" %}
-{% from "posts/_ai_generate.html" import ai_btn, ai_modals, ai_script %}
 
 {% block header %}
 <div class="d-flex justify-content-between align-items-center">
@@ -13,11 +12,6 @@
 {% endblock %}
 
 {% block content %}
-{# Контекст источника для AI-генерации (обновляется JS при смене источника) #}
-<div id="ai-generate-ctx" hidden
-     data-source-type=""
-     data-source-id=""></div>
-
 <div class="container-fluid">
     <div class="row">
         <div class="col-12 col-lg-7">
@@ -103,19 +97,13 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label d-flex align-items-center">
-                                Заголовок
-                                {{ ai_btn("title") }}
-                            </label>
+                            <label class="form-label">Заголовок</label>
                             <input type="text" name="title" class="form-control"
                                    value="{{ form_title if form_title is defined else post.title }}">
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label d-flex align-items-center">
-                                Текст
-                                {{ ai_btn("description") }}
-                            </label>
+                            <label class="form-label">Текст</label>
                             <textarea name="description" class="form-control" rows="6"
                                       >{{ form_description if form_description is defined else (post.description or '') }}</textarea>
                         </div>
@@ -142,12 +130,10 @@
     </div>
 </div>
 
-{{ ai_modals() }}
 {% endblock %}
 
 {% block script %}
 {{ super() }}
-{{ ai_script() }}
 <script>
 (function () {
     const ICONS = {
@@ -166,7 +152,6 @@
     const sel    = document.getElementById('source-select');
     const icon   = document.getElementById('source-icon');
     const title  = document.getElementById('source-title');
-    const ctxEl  = document.getElementById('ai-generate-ctx');
 
     function updateHeader() {
         const opt = sel.options[sel.selectedIndex];
@@ -183,10 +168,6 @@
             title.textContent    = 'Выберите источник';
             title.style.color    = '#94a3b8';
             title.style.fontStyle = 'italic';
-        }
-        if (ctxEl && opt) {
-            ctxEl.dataset.sourceType = opt.dataset.type || '';
-            ctxEl.dataset.sourceId   = opt.dataset.sourceId || '';
         }
     }
 

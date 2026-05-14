@@ -79,7 +79,43 @@ class RequestLoggingMiddleware:
         duration_ms = int((time.monotonic() - start) * 1000)
         log_http.info("HTTP %s %s → %d (%dms)", method, path, status_code, duration_ms)
 
-Base.metadata.create_all(bind=engine)
+def _db_start_error_message(exc: Exception) -> str:
+    """Возвращает короткую читаемую причину ошибки подключения к БД.
+
+    Пароль и полный DSN не включаются. Из DATABASE_URL извлекаются только
+    host, user, database для помощи в диагностике.
+    """
+    from app.database import DATABASE_URL
+
+    # Безопасная выжимка из DSN (без пароля)
+    try:
+        from sqlalchemy.engine.url import make_url
+        u = make_url(DATABASE_URL)
+        location = f"host={u.host}, user={u.username}, db={u.database}"
+    except Exception:
+        location = "(не удалось разобрать DATABASE_URL)"
+
+    # Классификация по тексту оригинального исключения psycopg2 / psycopg
+    orig = getattr(exc, "orig", None)
+    orig_str = str(orig).lower() if orig else str(exc).lower()
+
+    if "password authentication failed" in orig_str or "fe_sendauth" in orig_str:
+        reason = "неверный логин или пароль БД"
+    elif any(k in orig_str for k in ("could not translate host", "name or service not known", "nodename nor servname")):
+        reason = "БД недоступна — имя хоста не разрешается"
+    elif "connection refused" in orig_str:
+        reason = "БД недоступна — подключение отклонено"
+    elif "timed out" in orig_str or "timeout" in orig_str:
+        reason = "БД недоступна — таймаут подключения"
+    else:
+        # Первая строка оригинального исключения (без traceback)
+        first_line = (str(orig) if orig else str(exc)).splitlines()[0]
+        reason = first_line[:120]
+
+    return f"Не удалось подключиться к базе данных: {reason} ({location}). Проверьте DATABASE_URL."
+
+
+_startup_logger = logging.getLogger(__name__)
 
 # Rate limiter instance shared across the app (TASK-004)
 limiter = Limiter(key_func=get_remote_address)
@@ -132,9 +168,6 @@ def _migrate() -> None:
                 conn.commit()
 
 
-_migrate()
-
-
 def _migrate_scheduled_at_to_utc() -> None:
     """Однократно конвертирует scheduled_at из московского времени (UTC+3) в UTC.
 
@@ -173,9 +206,6 @@ def _migrate_scheduled_at_to_utc() -> None:
             "ADD COLUMN scheduled_at_utc_migrated INTEGER NOT NULL DEFAULT 1"
         ))
         conn.commit()
-
-
-_migrate_scheduled_at_to_utc()
 
 
 def _backfill_post_images() -> None:
@@ -229,9 +259,6 @@ def _backfill_post_images() -> None:
         db.commit()
 
 
-_backfill_post_images()
-
-
 def init_default_admin() -> None:
     """Создаёт первого суперадмина при пустой БД.
 
@@ -265,7 +292,24 @@ def init_default_admin() -> None:
             print(f"Default admin created: {username}")
 
 
-init_default_admin()
+# ── Стартовая инициализация БД ──────────────────────────────────────────────
+# Все операции с БД при старте обёрнуты в один try/except.
+# При OperationalError (недоступна БД, неверные креды и т.д.) выводится
+# одна читаемая строка ERROR и процесс завершается с кодом 1, чтобы Docker
+# мог перезапустить контейнер, а лог оставался чистым.
+# Полный traceback сохраняется на уровне DEBUG для отладки с LOG_LEVEL=DEBUG.
+try:
+    import sqlalchemy.exc as _sa_exc
+    Base.metadata.create_all(bind=engine)
+    _migrate()
+    _migrate_scheduled_at_to_utc()
+    _backfill_post_images()
+    init_default_admin()
+except (_sa_exc.OperationalError, _sa_exc.DBAPIError) as _db_exc:
+    import sys
+    _startup_logger.debug("Traceback при старте БД:", exc_info=True)
+    _startup_logger.error(_db_start_error_message(_db_exc))
+    sys.exit(1)
 
 
 @asynccontextmanager

@@ -66,7 +66,7 @@ _Enforced in:_ `app/views/posts.py @ PostWizardView._post()` step 1, `app/router
 **BR-014** — A post may have at most `MAX_IMAGES_PER_POST` (10) images. Attempts to upload more are rejected with an error message stating how many are already attached and how many are being added.
 _Enforced in:_ `app/views/posts.py @ PostWizardView._post()` step 1
 
-**BR-015** — `post.description` (and `channel.description`) stores raw markdown text. Conversion to HTML or plain text happens exclusively in `build_text()` at publish time, never at save time. The UI uses EasyMDE as the markdown editor on step 1 and step 3.
+**BR-015** — `post.description` (and `channel.description`) stores raw markdown text. Conversion to HTML or plain text happens exclusively in `build_text()` at publish time, never at save time. The UI uses EasyMDE as the markdown editor on step 1 and step 3; both steps render Markdown/Визуальный tab switcher (`#editor-tabs`) via shared CSS `admin/statics/css/editor-tabs.css`.
 _Enforced in:_ `app/publisher/utils.py @ build_text()`, `admin/templates/posts/step1.html`, `admin/templates/posts/step3.html`
 
 **BR-012** — Tags are stored as a raw comma-separated string. They are converted to `#hashtag` format at publish time via `format_tags()`, not at creation time.
@@ -170,6 +170,9 @@ Parts joined with `\n\n`.
 - Never set `post.status = published` outside the worker
 - Never bypass `build_text()` when assembling publish text
 - When adding a new source type, update the source picker in wizard steps 2 and 3
+
+**BR-016** — Step 1 of the wizard exposes AI generation buttons for both `title` and `description` fields. Because no source is committed to the post yet, the user selects an optional source from a dropdown (`#ai-source-select`) whose selection is synced into `#ai-generate-ctx` via JS. If no source is selected (default), generation proceeds with `source_type="none"` and `source_id=0`; the backend falls back to `base_prompt` only (BR-007 in `rules/domain/ai-integration.md`). Active Telegram, VK, and MAX sources are passed to the step 1 template context by `PostWizardView`. WebhookSource is excluded because it has no AI prompts.
+_Enforced in:_ `app/views/posts.py @ PostWizardView._get()` and `_post()` step 1, `admin/templates/posts/step1.html`, `admin/templates/posts/_ai_generate.html`
 
 ---
 

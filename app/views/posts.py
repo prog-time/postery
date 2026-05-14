@@ -56,7 +56,9 @@ class PostWizardView(EditorAccessMixin, CustomView):
             return templates.TemplateResponse(
                 request=request,
                 name="posts/step1.html",
-                context={"step": 1, "post": post, "wizard_url": wizard_url},
+                context={
+                    "step": 1, "post": post, "wizard_url": wizard_url,
+                },
             )
 
         if step == 2:
@@ -101,7 +103,6 @@ class PostWizardView(EditorAccessMixin, CustomView):
                     },
                 )
             next_channel = _next_channel(post, channel)
-            auto_generate = bool(source and getattr(source, "auto_generate", False))
             return templates.TemplateResponse(
                 request=request,
                 name="posts/step3.html",
@@ -114,7 +115,6 @@ class PostWizardView(EditorAccessMixin, CustomView):
                     "total": len(post.channels),
                     "current_num": post.channels.index(channel) + 1,
                     "wizard_url": wizard_url,
-                    "auto_generate": auto_generate,
                 },
             )
 
@@ -127,14 +127,20 @@ class PostWizardView(EditorAccessMixin, CustomView):
 
         # ── Шаг 1: создать/обновить пост ────────────────────────────────────
         if step == 1:
-            title = (form.get("title") or "").strip()
-            if not title:
-                post = db.get(Post, int(post_id)) if post_id else None
+            def _step1_error(post_obj, msg):
                 return templates.TemplateResponse(
                     request=request,
                     name="posts/step1.html",
-                    context={"step": 1, "post": post, "error": "Заголовок обязателен", "form": dict(form), "wizard_url": wizard_url},
+                    context={
+                        "step": 1, "post": post_obj, "error": msg, "form": dict(form),
+                        "wizard_url": wizard_url,
+                    },
                 )
+
+            title = (form.get("title") or "").strip()
+            if not title:
+                post = db.get(Post, int(post_id)) if post_id else None
+                return _step1_error(post, "Заголовок обязателен")
 
             if post_id:
                 post = db.get(Post, int(post_id))
@@ -162,32 +168,12 @@ class PostWizardView(EditorAccessMixin, CustomView):
                 if ext not in ALLOWED_IMAGE_EXTENSIONS:
                     db.rollback()
                     post_ctx = db.get(Post, int(post_id)) if post_id else None
-                    return templates.TemplateResponse(
-                        request=request,
-                        name="posts/step1.html",
-                        context={
-                            "step": 1,
-                            "post": post_ctx,
-                            "error": f"Недопустимый формат файла: «{img.filename}». Разрешены: JPG, JPEG, PNG, GIF, WEBP.",
-                            "form": dict(form),
-                            "wizard_url": wizard_url,
-                        },
-                    )
+                    return _step1_error(post_ctx, f"Недопустимый формат файла: «{img.filename}». Разрешены: JPG, JPEG, PNG, GIF, WEBP.")
                 content = await img.read()
                 if len(content) > max_bytes:
                     db.rollback()
                     post_ctx = db.get(Post, int(post_id)) if post_id else None
-                    return templates.TemplateResponse(
-                        request=request,
-                        name="posts/step1.html",
-                        context={
-                            "step": 1,
-                            "post": post_ctx,
-                            "error": f"Файл «{img.filename}» превышает допустимый размер {MAX_IMAGE_SIZE_MB} МБ.",
-                            "form": dict(form),
-                            "wizard_url": wizard_url,
-                        },
-                    )
+                    return _step1_error(post_ctx, f"Файл «{img.filename}» превышает допустимый размер {MAX_IMAGE_SIZE_MB} МБ.")
                 validated.append((img, content))
 
             # Проверка лимита: текущие + новые не должны превышать MAX_IMAGES_PER_POST
@@ -195,20 +181,10 @@ class PostWizardView(EditorAccessMixin, CustomView):
             if existing_count + len(validated) > MAX_IMAGES_PER_POST:
                 db.rollback()
                 post_ctx = db.get(Post, int(post_id)) if post_id else None
-                return templates.TemplateResponse(
-                    request=request,
-                    name="posts/step1.html",
-                    context={
-                        "step": 1,
-                        "post": post_ctx,
-                        "error": (
-                            f"Нельзя прикрепить больше {MAX_IMAGES_PER_POST} изображений. "
-                            f"Уже прикреплено: {existing_count}, добавляется: {len(validated)}."
-                        ),
-                        "form": dict(form),
-                        "wizard_url": wizard_url,
-                    },
-                )
+                return _step1_error(post_ctx, (
+                    f"Нельзя прикрепить больше {MAX_IMAGES_PER_POST} изображений. "
+                    f"Уже прикреплено: {existing_count}, добавляется: {len(validated)}."
+                ))
 
             for img, content in validated:
                 upload_dir = UPLOAD_DIR / str(post.id)
